@@ -8,12 +8,18 @@ TTY which pytest doesn't have.
 
 from __future__ import annotations
 
+from prompt_toolkit.formatted_text import StyleAndTextTuples
+
 from pythinker_code.ui.shell.selector import (
     SelectorConfig,
     SelectorItem,
-    _SelectorState,  # type: ignore[reportPrivateUsage]
     _format_item_line,  # type: ignore[reportPrivateUsage]
+    _SelectorState,  # type: ignore[reportPrivateUsage]
 )
+
+
+def _plain(fragments: StyleAndTextTuples) -> str:
+    return "".join(fragment[1] for fragment in fragments)
 
 
 def _make_state(items: list[SelectorItem[str]], *, enable_filter: bool = True):
@@ -154,7 +160,7 @@ def test_format_item_line_marks_selected_with_arrow():
         is_selected=True,
         width=40,
     )
-    flat = "".join(text for _, text in line)
+    flat = _plain(line)
     assert "›" in flat
     assert "alpha" in flat
     assert "first" in flat
@@ -166,5 +172,5 @@ def test_format_item_line_includes_current_marker():
         is_selected=False,
         width=40,
     )
-    flat = "".join(text for _, text in line)
+    flat = _plain(line)
     assert "(current)" in flat
