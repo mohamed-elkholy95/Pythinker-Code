@@ -27,12 +27,13 @@ _IMAGE_PLACEHOLDER_RE = re.compile(
     r"\[(?P<type>[a-zA-Z0-9_\-]+):(?P<id>[a-zA-Z0-9_\-\.]+)"
     r"(?:,(?P<width>\d+)x(?P<height>\d+))?\]"
 )
+_IMAGE_DISPLAY_PLACEHOLDER_RE = re.compile(r"\[Image #(?P<seq>\d+)\]")
 _PASTED_TEXT_PLACEHOLDER_RE = re.compile(
     r"\[Pasted text #(?P<id>\d+)(?: \+(?P<lines>\d+) lines?)?\]"
 )
 
-_TEXT_PASTE_CHAR_THRESHOLD = get_env_int("PYTHINKER_CLI_PASTE_CHAR_THRESHOLD", 1000)
-_TEXT_PASTE_LINE_THRESHOLD = get_env_int("PYTHINKER_CLI_PASTE_LINE_THRESHOLD", 15)
+_TEXT_PASTE_CHAR_THRESHOLD = get_env_int("PYTHINKER_CLI_PASTE_CHAR_THRESHOLD", 200)
+_TEXT_PASTE_LINE_THRESHOLD = get_env_int("PYTHINKER_CLI_PASTE_LINE_THRESHOLD", 5)
 
 
 def sanitize_surrogates(text: str) -> str:
@@ -387,29 +388,72 @@ class PastedTextPlaceholderHandler:
         return mapped_start, mapped_end
 
 
+@dataclass(slots=True)
+class ImagePlaceholderEntry:
+    seq: int
+    attachment_id: str
+    width: int
+    height: int
+
+    @property
+    def display_token(self) -> str:
+        return f"[Image #{self.seq}]"
+
+    @property
+    def canonical_token(self) -> str:
+        return f"[image:{self.attachment_id},{self.width}x{self.height}]"
+
+
 class ImagePlaceholderHandler:
     def __init__(self, attachment_cache: AttachmentCache) -> None:
         self._attachment_cache = attachment_cache
+        self._entries: dict[int, ImagePlaceholderEntry] = {}
+        self._next_seq = 1
 
     def create_placeholder(self, image: Image.Image) -> str | None:
         cached = self._attachment_cache.store_image(image)
         if cached is None:
             return None
-        return f"[image:{cached.attachment_id},{image.width}x{image.height}]"
+        entry = ImagePlaceholderEntry(
+            seq=self._next_seq,
+            attachment_id=cached.attachment_id,
+            width=image.width,
+            height=image.height,
+        )
+        self._entries[entry.seq] = entry
+        self._next_seq += 1
+        return entry.display_token
 
     def find_next(self, text: str, start: int = 0) -> PlaceholderTokenMatch | None:
-        match = _IMAGE_PLACEHOLDER_RE.search(text, start)
-        if match is None:
+        display_match = _IMAGE_DISPLAY_PLACEHOLDER_RE.search(text, start)
+        canonical_match = _IMAGE_PLACEHOLDER_RE.search(text, start)
+        chosen = self._earliest(display_match, canonical_match)
+        if chosen is None:
             return None
         return PlaceholderTokenMatch(
-            start=match.start(),
-            end=match.end(),
-            raw=match.group(0),
+            start=chosen.start(),
+            end=chosen.end(),
+            raw=chosen.group(0),
             handler=self,
-            match=match,
+            match=chosen,
         )
 
+    @staticmethod
+    def _earliest(*matches: re.Match[str] | None) -> re.Match[str] | None:
+        candidates = [m for m in matches if m is not None]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda m: m.start())
+
+    def _entry_for_match(self, match: PlaceholderTokenMatch) -> ImagePlaceholderEntry | None:
+        if match.match.re is _IMAGE_DISPLAY_PLACEHOLDER_RE:
+            return self._entries.get(int(match.match.group("seq")))
+        return None
+
     def resolve_content(self, match: PlaceholderTokenMatch) -> list[ContentPart] | None:
+        entry = self._entry_for_match(match)
+        if entry is not None:
+            return self._attachment_cache.load_content_parts("image", entry.attachment_id)
         kind = parse_attachment_kind(match.match.group("type"))
         if kind is None:
             return None
@@ -419,6 +463,9 @@ class ImagePlaceholderHandler:
         return match.raw
 
     def serialize_for_history(self, match: PlaceholderTokenMatch) -> str | None:
+        entry = self._entry_for_match(match)
+        if entry is not None:
+            return entry.canonical_token
         return match.raw
 
     def expand_for_editor(self, match: PlaceholderTokenMatch) -> str | None:

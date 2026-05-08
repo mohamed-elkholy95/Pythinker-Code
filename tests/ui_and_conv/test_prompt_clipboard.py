@@ -181,7 +181,7 @@ def test_paste_single_image(monkeypatch) -> None:
 
     assert result is True
     assert len(buffer.inserted) == 1
-    assert buffer.inserted[0].startswith("[image:")
+    assert buffer.inserted[0].startswith("[Image #")
 
 
 def test_paste_image_unsupported_model(monkeypatch, capsys) -> None:
@@ -228,7 +228,7 @@ def test_paste_files_and_images_together(monkeypatch) -> None:
     # Should have one insert_text call with file path + image placeholder
     joined = "".join(buffer.inserted)
     assert "/tmp/doc.pdf" in joined
-    assert "[image:" in joined
+    assert "[Image #" in joined
 
 
 def test_paste_returns_false_when_all_images_fail_to_cache(monkeypatch) -> None:

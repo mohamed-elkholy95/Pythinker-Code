@@ -30,14 +30,18 @@ def test_append_history_entry_expands_text_placeholders_but_preserves_images(tmp
     image = Image.new("RGB", (4, 4), color=(10, 20, 30))
     image_token = manager.create_image_placeholder(image)
 
-    assert image_token is not None
+    assert image_token == "[Image #1]"
 
     prompt_session = _make_prompt_session(tmp_path, manager)
     prompt_session._append_history_entry(f"before {text_token} {image_token} after")
 
-    assert _read_history_lines(prompt_session._history_file) == [
-        {"content": f"before {pasted_text} {image_token} after"}
-    ]
+    # Display token `[Image #N]` is rewritten to canonical `[image:<id>,WxH]` so history
+    # remains resolvable across sessions via the attachment cache.
+    lines = _read_history_lines(prompt_session._history_file)
+    assert len(lines) == 1
+    content = lines[0]["content"]
+    assert content.startswith(f"before {pasted_text} [image:")
+    assert content.endswith(",4x4] after")
 
 
 def test_append_history_entry_deduplicates_consecutive_tokens_with_same_expanded_text(

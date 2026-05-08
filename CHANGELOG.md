@@ -4,6 +4,8 @@
 
 - Update notifier: standalone "Update Available" banner shown above the welcome panel when a newer release is on PyPI; suppressed by `PYTHINKER_CLI_NO_AUTO_UPDATE=1`.
 - New `pythinker update` subcommand (`--check` for a non-installing check) that auto-detects the install method (`uv tool`, `pipx`, or `pip`) and runs the matching upgrade command.
+- Image paste placeholder now renders as `[Image #N]` in the input/buffer (mirroring `[Pasted text #N +K lines]`); history serialization keeps the canonical `[image:<id>,WxH]` form so attachments still resolve cross-session.
+- Lower default paste-placeholderize thresholds to 200 chars / 5 lines (was 1000 / 15) so medium-length pastes collapse into `[Pasted text #N]` instead of overflowing the compact input window. Override via `PYTHINKER_CLI_PASTE_CHAR_THRESHOLD` and `PYTHINKER_CLI_PASTE_LINE_THRESHOLD`.
 
 ## 1.0.0 (2026-05-06)
 

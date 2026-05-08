@@ -17,11 +17,14 @@ def test_placeholder_manager_serializes_text_tokens_for_history(tmp_path) -> Non
     image = Image.new("RGB", (4, 4), color=(10, 20, 30))
     image_token = manager.create_image_placeholder(image)
 
-    assert image_token is not None
+    assert image_token == "[Image #1]"
 
     history_text = manager.serialize_for_history(f"before {text_token} {image_token} after")
 
-    assert history_text == f"before alpha\nbeta\ngamma {image_token} after"
+    # Image tokens serialize to their canonical attachment form so history can resolve
+    # cross-session via the cache. Text tokens expand inline.
+    assert history_text.startswith("before alpha\nbeta\ngamma [image:")
+    assert history_text.endswith(",4x4] after")
 
 
 def test_placeholder_manager_refolds_editor_text_for_known_text_tokens() -> None:
@@ -158,11 +161,11 @@ def test_placeholder_manager_sanitizes_surrogates_in_pasted_text() -> None:
 
 
 def test_placeholderize_thresholds_cover_char_and_line_boundaries() -> None:
-    assert should_placeholderize_pasted_text("A" * 999) is False
-    assert should_placeholderize_pasted_text("A" * 1000) is True
+    assert should_placeholderize_pasted_text("A" * 199) is False
+    assert should_placeholderize_pasted_text("A" * 200) is True
     assert should_placeholderize_pasted_text("line1\nline2") is False
-    assert should_placeholderize_pasted_text("\n".join([f"line{i}" for i in range(1, 15)])) is False
-    assert should_placeholderize_pasted_text("\n".join([f"line{i}" for i in range(1, 16)])) is True
+    assert should_placeholderize_pasted_text("\n".join([f"line{i}" for i in range(1, 5)])) is False
+    assert should_placeholderize_pasted_text("\n".join([f"line{i}" for i in range(1, 6)])) is True
 
 
 def test_placeholder_manager_normalizes_crlf_before_threshold_and_resolution() -> None:
