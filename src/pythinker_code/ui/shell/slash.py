@@ -703,6 +703,100 @@ def theme(app: Shell, args: str):
 
 
 @registry.command
+@shell_mode_registry.command
+def keys(app: Shell, args: str):
+    """List keyboard shortcuts (semantic keymap)"""
+    from rich.console import Group, RenderableType
+    from rich.table import Table
+    from rich.text import Text
+
+    from pythinker_code.ui.shell.keymap import all_keybindings
+
+    bindings = all_keybindings()
+    if not bindings:
+        console.print("[yellow]No keybindings registered.[/yellow]")
+        return
+
+    table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2))
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Keys", style="bold")
+
+    for name in sorted(bindings):
+        keys_text = "/".join(bindings[name])
+        table.add_row(name, keys_text)
+
+    blocks: list[RenderableType] = [
+        Text.from_markup("[bold]Keyboard shortcuts[/bold]"),
+        table,
+    ]
+    console.print(Group(*blocks))
+
+
+@registry.command
+@shell_mode_registry.command
+def tui(app: Shell, args: str):
+    """Show or set the TUI style: pi or pythinker"""
+    from pythinker_code.ui.tui_config import get_active_tui_style, set_active_tui_style
+
+    soul = ensure_pythinker_soul(app)
+    if soul is None:
+        return
+
+    current = get_active_tui_style()
+    arg = args.strip().lower()
+
+    # Accept "/tui pi", "/tui style pi", "/tui set pi" — all the natural shapes.
+    parts = arg.split()
+    if parts and parts[0] in ("style", "set"):
+        parts = parts[1:]
+    target = parts[0] if parts else ""
+
+    if not target:
+        console.print(f"Current TUI style: [bold]{current}[/bold]")
+        console.print("[grey50]Usage: /tui pi | /tui pythinker[/grey50]")
+        return
+
+    if target not in ("pi", "pythinker"):
+        console.print(f"[red]Unknown style: {target}. Use 'pi' or 'pythinker'.[/red]")
+        return
+
+    if target == current:
+        console.print(f"[yellow]Already using {target} style.[/yellow]")
+        return
+
+    config_file = soul.runtime.config.source_file
+    if config_file is None:
+        # Apply in-memory only — useful for one-off testing without a persisted config.
+        set_active_tui_style(target)
+        console.print(
+            f"[green]Switched to {target} style for this session "
+            "(no config file to persist).[/green]"
+        )
+        return
+
+    try:
+        config_for_save = load_config(config_file)
+        config_for_save.tui.style = target  # type: ignore[assignment]
+        save_config(config_for_save, config_file)
+    except (ConfigError, OSError) as exc:
+        console.print(f"[red]Failed to save config: {exc}[/red]")
+        return
+
+    set_active_tui_style(target)
+    if target == "pi":
+        # Make sure renderers are present immediately for current session.
+        from pythinker_code.ui.shell.tool_renderers import register_builtin_renderers
+
+        register_builtin_renderers()
+
+    from pythinker_code.telemetry import track
+
+    track("tui_style_switch", style=target)
+    console.print(f"[green]Switched to {target} style. Reloading...[/green]")
+    raise Reload(session_id=soul.runtime.session.id)
+
+
+@registry.command
 def web(app: Shell, args: str):
     """Open Pythinker Web UI in browser"""
     from pythinker_code.telemetry import track

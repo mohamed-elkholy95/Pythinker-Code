@@ -42,6 +42,8 @@ from pythinker_code.events import EventBus, EventHandler, create_event_bus
 from pythinker_code.ui.shell.keymap import register_keybinding as _register_keybinding
 from pythinker_code.ui.shell.tool_renderers import (
     ToolRenderDefinition,
+)
+from pythinker_code.ui.shell.tool_renderers import (
     register_tool_renderer as _register_tool_renderer,
 )
 from pythinker_code.utils.logging import logger

@@ -23,6 +23,7 @@ from pythinker_code.ui.shell.components.footer import (
     format_tokens,
     render_footer,
 )
+from pythinker_code.ui.shell.components.key_hints import key_hint, raw_key_hint
 from pythinker_code.ui.shell.components.messages import (
     AssistantContent,
     CustomMessageInput,
@@ -30,7 +31,6 @@ from pythinker_code.ui.shell.components.messages import (
     render_custom_message,
     render_user_message,
 )
-from pythinker_code.ui.shell.components.key_hints import key_hint, raw_key_hint
 from pythinker_code.ui.shell.components.render_utils import (
     cell_width,
     dim,

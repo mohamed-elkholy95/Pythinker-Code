@@ -2133,6 +2133,14 @@ class CustomPromptSession:
         assert app is not None
         columns = app.output.get_size().columns
 
+        # Pi-style footer dispatch. Mirrors components/footer.ts layout while
+        # reusing the existing data sources so we never lose information vs
+        # the legacy toolbar.
+        from pythinker_code.ui.tui_config import is_pi_style
+
+        if is_pi_style():
+            return self._render_pi_bottom_toolbar(columns)
+
         fragments: list[tuple[str, str]] = []
         tc = get_toolbar_colors()
 
@@ -2253,6 +2261,97 @@ class CustomPromptSession:
         fragments.append(("", " " * max(0, columns - left_width - right_width)))
         fragments.append(("", right_text))
 
+        return FormattedText(fragments)
+
+    def _render_pi_bottom_toolbar(self, columns: int) -> FormattedText:
+        """Pi-style two-line footer.
+
+        Line 1: cwd (home-shortened) + ``(branch)`` + mode/flag chips.
+        Line 2: context% + model on the right; toast/extension statuses left.
+        """
+        from pythinker_code.extensions import footer_statuses
+        from pythinker_code.ui.shell.components import format_tokens
+
+        fragments: list[tuple[str, str]] = []
+        tc = get_toolbar_colors()
+
+        fragments.append((tc.separator, "─" * columns))
+        fragments.append(("", "\n"))
+
+        # ── line 1: cwd + git + status flags ───────────────────────────────
+        try:
+            cwd_str = _shorten_cwd(str(HostPath.cwd()))
+        except OSError:
+            app = get_app_or_none()
+            if app is not None:
+                app.exit(exception=CwdLostError())
+            return FormattedText([])
+        cwd_text = _truncate_left(cwd_str, _MAX_CWD_COLS)
+        branch = _get_git_branch()
+        if branch:
+            dirty, ahead, behind = _get_git_status()
+            branch_short = _truncate_right(branch, _MAX_BRANCH_COLS)
+            cwd_text = f"{cwd_text}  {_format_git_badge(branch_short, dirty, ahead, behind)}"
+        cwd_text = _truncate_right(cwd_text, max(0, columns))
+        fragments.append((tc.cwd, cwd_text))
+
+        status = self._status_provider()
+        flag_chips: list[tuple[str, str]] = []
+        if status.yolo_enabled:
+            flag_chips.append((tc.yolo_label, "yolo"))
+        if status.auto_enabled:
+            flag_chips.append((tc.auto_label, "auto"))
+        if status.plan_mode:
+            flag_chips.append((tc.plan_label, "plan"))
+        for style, label in flag_chips:
+            fragments.append(("", "  "))
+            fragments.append((style, label))
+
+        fragments.append(("", "\n"))
+
+        # ── line 2: extension statuses (left) + context% + model (right) ───
+        right_parts: list[str] = []
+        right_parts.append(
+            format_context_status(
+                status.context_usage,
+                status.context_tokens,
+                status.max_context_tokens,
+            )
+        )
+        # Compact ``17k/200k`` glyph next to the percentage when both sides are known.
+        if status.max_context_tokens:
+            ctx_compact = (
+                f"{format_tokens(status.context_tokens)}/"
+                f"{format_tokens(status.max_context_tokens)}"
+            )
+            right_parts.append(ctx_compact)
+        if self._model_name:
+            thinking_dot = "●" if self._thinking else "○"
+            mode = str(self._mode)
+            right_parts.append(f"{mode} {self._model_name} {thinking_dot}")
+        right_text = "  ".join(right_parts)
+        right_width = _display_width(right_text)
+
+        # Left side: prefer extension statuses, then any active toast.
+        ext = footer_statuses()
+        if ext:
+            ordered = sorted(ext.items())
+            ext_line = " ".join(f"{k}:{v}" for k, v in ordered)
+            ext_line = _truncate_right(ext_line, max(0, columns - right_width - 2))
+            fragments.append((tc.tip, ext_line))
+            left_width = _display_width(ext_line)
+        else:
+            left_toast = _current_toast("left")
+            if left_toast is not None:
+                left_text = left_toast.message
+                left_text = _truncate_right(left_text, max(0, columns - right_width - 2))
+                fragments.append(("", left_text))
+                left_width = _display_width(left_text)
+            else:
+                left_width = 0
+
+        fragments.append(("", " " * max(0, columns - left_width - right_width)))
+        fragments.append(("", right_text))
         return FormattedText(fragments)
 
     def _get_two_rotating_tips(self) -> str | None:

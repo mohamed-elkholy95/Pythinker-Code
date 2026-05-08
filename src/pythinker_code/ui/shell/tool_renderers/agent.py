@@ -71,7 +71,9 @@ def _render_call(ctx: ToolRenderContext) -> RenderableType:
 def _render_result(ctx: ToolRenderContext, result: ToolResultPayload) -> RenderableType | None:
     if not result.text:
         return None
-    icon = fg("error", "✗") if result.is_error else fg("success", "✓")
+    # Distinct success symbol so the eye doesn't mistake a finished subagent
+    # for a generic tool tick — heavy check on success, heavy ballot on error.
+    icon = fg("error", "✘") if result.is_error else fg("success", "✔")
     body, remaining = format_lines_block(
         result.text,
         expanded=ctx.expanded,
