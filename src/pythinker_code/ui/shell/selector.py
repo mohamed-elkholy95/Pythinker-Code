@@ -23,7 +23,7 @@ Public API:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from prompt_toolkit.application import Application
@@ -37,6 +37,7 @@ from pythinker_code.ui.theme import get_prompt_style
 
 __all__ = [
     "SelectorConfig",
+    "SelectorHeader",
     "SelectorItem",
     "run_selector",
 ]
@@ -61,11 +62,18 @@ class SelectorItem[T]:
 
 
 @dataclass(frozen=True, slots=True)
+class SelectorHeader:
+    """A non-selectable divider row in a selector."""
+
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
 class SelectorConfig[T]:
     """Static configuration for a selector dialog."""
 
     title: str
-    items: Sequence[SelectorItem[T]]
+    items: Sequence[SelectorItem[T] | SelectorHeader]
     """Source rows. May be empty — the selector will show a placeholder."""
 
     hint: str = "↑↓ navigate · Enter select · Esc cancel · type to filter"
@@ -73,6 +81,9 @@ class SelectorConfig[T]:
 
     enable_filter: bool = True
     """When False, type-to-filter is disabled (useful for tiny selectors)."""
+
+    on_change: Callable[[T], None] | None = None
+    """Called whenever the cursor moves to a different SelectorItem."""
 
 
 def _format_item_line[T](
@@ -135,7 +146,7 @@ class _SelectorState[T]:
         self.config = config
         self.filter = ""
         self.selected_idx = 0
-        self.visible: list[SelectorItem[T]] = []
+        self.visible: list[SelectorItem[T] | SelectorHeader] = []
         self.result: T | None = None
         self.cancelled = False
         self._refilter(initial=True)
@@ -146,43 +157,67 @@ class _SelectorState[T]:
         needle = self.filter.lower()
         return needle in item.label.lower() or needle in item.description.lower()
 
+    def _selectable_indices(self) -> list[int]:
+        return [i for i, item in enumerate(self.visible) if isinstance(item, SelectorItem)]
+
     def _refilter(self, *, initial: bool = False) -> None:
-        previous_value = None
+        previous_value: T | None = None
         if not initial and self.visible and 0 <= self.selected_idx < len(self.visible):
-            previous_value = self.visible[self.selected_idx].value
+            current = self.visible[self.selected_idx]
+            if isinstance(current, SelectorItem):
+                previous_value = current.value
 
-        self.visible = [item for item in self.config.items if self._matches(item)]
+        if not self.filter:
+            self.visible = list(self.config.items)
+        else:
+            self.visible = [
+                item
+                for item in self.config.items
+                if isinstance(item, SelectorItem) and self._matches(item)
+            ]
 
-        if not self.visible:
+        selectable = self._selectable_indices()
+        if not selectable:
             self.selected_idx = 0
             return
 
-        # Try to preserve the selected value across filter edits.
         if previous_value is not None:
             for i, item in enumerate(self.visible):
-                if item.value == previous_value:
+                if isinstance(item, SelectorItem) and item.value == previous_value:
                     self.selected_idx = i
                     return
 
-        # On initial open, prefer the item flagged is_current.
         if initial:
             for i, item in enumerate(self.visible):
-                if item.is_current:
+                if isinstance(item, SelectorItem) and item.is_current:
                     self.selected_idx = i
                     return
 
-        # Fall back to the first visible row.
-        self.selected_idx = 0
+        self.selected_idx = selectable[0]
 
     def move(self, delta: int) -> None:
-        if not self.visible:
+        selectable = self._selectable_indices()
+        if not selectable:
             return
-        self.selected_idx = (self.selected_idx + delta) % len(self.visible)
+        try:
+            pos = selectable.index(self.selected_idx)
+        except ValueError:
+            pos = 0
+        new_idx = selectable[(pos + delta) % len(selectable)]
+        changed = new_idx != self.selected_idx
+        self.selected_idx = new_idx
+        if changed and self.config.on_change is not None:
+            item = self.visible[new_idx]
+            if isinstance(item, SelectorItem):
+                self.config.on_change(item.value)
 
     def commit(self) -> bool:
-        if not self.visible:
+        if not self.visible or self.selected_idx >= len(self.visible):
             return False
-        self.result = self.visible[self.selected_idx].value
+        item = self.visible[self.selected_idx]
+        if not isinstance(item, SelectorItem):
+            return False
+        self.result = item.value
         return True
 
     def append_filter(self, ch: str) -> None:
@@ -220,13 +255,18 @@ def _build_application[T](state: _SelectorState[T]) -> Application[None]:
                 ("class:slash-completion-menu.meta", "  no matches"),
                 ("", "\n"),
             ]
-        # Width is provided by prompt_toolkit during render, but Window
-        # control APIs don't pass it here — use a reasonable default; the
-        # row-level background handles trailing fill for any extra cells.
         width = 80
         rows: StyleAndTextTuples = []
         for i, item in enumerate(state.visible):
-            rows.extend(_format_item_line(item, is_selected=i == state.selected_idx, width=width))
+            if isinstance(item, SelectorHeader):
+                rows.extend([
+                    ("class:slash-completion-menu.meta", f"  {item.label}"),
+                    ("", "\n"),
+                ])
+            else:
+                rows.extend(
+                    _format_item_line(item, is_selected=i == state.selected_idx, width=width)
+                )
         return rows
 
     def hint_text() -> StyleAndTextTuples:
