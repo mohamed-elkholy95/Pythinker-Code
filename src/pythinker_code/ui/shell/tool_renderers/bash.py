@@ -1,23 +1,28 @@
 """Pi-style renderer for Pythinker's ``Shell`` tool.
 
-Mirrors ``packages/coding-agent/src/core/tools/bash.ts`` (Pi reference).
+Mirrors ``packages/coding-agent/src/core/tools/bash.ts`` (Pi reference) but
+delegates the actual visual treatment to the bordered
+:func:`render_bash_execution` component for completed results, giving the
+shell tool the same look as Pi's interactive shell mode.
 
 Pi tool name → Pythinker tool name: ``bash`` → ``Shell``.
 Param mapping: Pythinker has ``command``, ``timeout``, ``run_in_background``,
 ``description``; Pi has ``command``, ``timeout`` only.
-
-The richer bordered "shell mode" presentation lives in
-:mod:`pythinker_code.ui.shell.components.bash_execution` — for *tool*
-invocations Pi keeps things compact, so we follow suit and let the
-``ToolExecutionComponent`` handle the success/error background tint.
 """
 
 from __future__ import annotations
 
-from rich.console import Group, RenderableType
+from typing import cast
+
+from rich.console import RenderableType
 from rich.style import Style as RichStyle
 from rich.text import Text
 
+from pythinker_code.ui.shell.components.bash_execution import (
+    BashExecutionState,
+    BashStatus,
+    render_bash_execution,
+)
 from pythinker_code.ui.shell.tool_renderers import (
     ToolRenderContext,
     ToolRenderDefinition,
@@ -26,16 +31,24 @@ from pythinker_code.ui.shell.tool_renderers import (
 from pythinker_code.ui.shell.tool_renderers._render_utils import (
     as_str,
     fg,
-    format_lines_block,
     invalid_arg,
 )
 from pythinker_code.ui.theme import tui_rich_style
 
 _TOOL_NAME = "Shell"
-_DEFAULT_COLLAPSED_LINES = 20
 
 
-def _render_call(ctx: ToolRenderContext) -> RenderableType:
+def _render_call(ctx: ToolRenderContext) -> RenderableType | None:
+    """Header for the call.
+
+    When the result is already in hand we suppress the header — the
+    bordered :func:`render_bash_execution` block produced by
+    :func:`_render_result` already contains the ``$ <command>`` line and
+    a free-floating header above it would look like a duplicate.
+    """
+    if ctx.state.get("__bash_use_bordered__"):
+        return None
+
     args = ctx.args or {}
     command = as_str(args.get("command"))
     timeout = args.get("timeout")
@@ -61,28 +74,30 @@ def _render_call(ctx: ToolRenderContext) -> RenderableType:
 
 
 def _render_result(ctx: ToolRenderContext, result: ToolResultPayload) -> RenderableType | None:
-    if not result.text:
+    """Render a Pi-style bordered shell card with output, status, exit code."""
+    args = ctx.args or {}
+    command = as_str(args.get("command")) or ""
+    if not command:
         return None
-    body, remaining = format_lines_block(
-        result.text,
+    # Mark for the call renderer so it skips the duplicate header.
+    state = cast("dict[str, object]", ctx.state)
+    state["__bash_use_bordered__"] = True
+
+    status: BashStatus = "error" if result.is_error else "complete"
+    bash_state = BashExecutionState(
+        command=command,
+        output=result.text or "",
+        status=status,
+        exit_code=None if not result.is_error else 1,
         expanded=ctx.expanded,
-        collapsed_max_lines=_DEFAULT_COLLAPSED_LINES,
-        style_token="error" if result.is_error else "tool_output",
     )
-    if not body.plain:
-        return None
-    if remaining > 0:
-        # Pi shows "earlier lines" because bash tool truncates from the head
-        # (last lines are what matter for command output).
-        more = fg("muted", f"... ({remaining} earlier lines, ctrl+e to expand)")
-        return Group(more, body)
-    return body
+    return render_bash_execution(bash_state)
 
 
 SHELL_RENDERER = ToolRenderDefinition(
     name=_TOOL_NAME,
     label="bash",
-    render_shell="default",
+    render_shell="self",
     render_call=_render_call,
     render_result=_render_result,
 )
