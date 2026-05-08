@@ -208,3 +208,161 @@ def test_render_diff_colorizes_added_removed():
     plain = render_plain(render_diff(diff), width=60)
     assert "hello" in plain
     assert "world" in plain
+
+
+# ---------------------------------------------------------------------------
+# Agent (subagent)
+# ---------------------------------------------------------------------------
+
+
+def test_agent_renders_type_description_and_prompt_preview():
+    rendered = _render(
+        "Agent",
+        {
+            "subagent_type": "code-architect",
+            "description": "design auth flow",
+            "prompt": "Design the OAuth flow with PKCE\nAdditional context...",
+        },
+        output="Plan ready",
+    )
+    assert "subagent" in rendered
+    assert "code-architect" in rendered
+    assert "design auth flow" in rendered
+    assert "Design the OAuth flow with PKCE" in rendered
+
+
+# ---------------------------------------------------------------------------
+# AskUserQuestion
+# ---------------------------------------------------------------------------
+
+
+def test_ask_user_renders_question_and_options():
+    rendered = _render(
+        "AskUserQuestion",
+        {
+            "questions": [
+                {
+                    "question": "Which auth method?",
+                    "options": [
+                        {"label": "OAuth"},
+                        {"label": "API key"},
+                    ],
+                }
+            ]
+        },
+    )
+    assert "ask user" in rendered
+    assert "Which auth method?" in rendered
+    assert "OAuth" in rendered
+    assert "API key" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Think
+# ---------------------------------------------------------------------------
+
+
+def test_think_renders_thought_body():
+    rendered = _render("Think", {"thought": "First, check the file layout.\nThen draft a fix."})
+    assert "think" in rendered
+    assert "First, check the file layout." in rendered
+
+
+# ---------------------------------------------------------------------------
+# SetTodoList
+# ---------------------------------------------------------------------------
+
+
+def test_todo_renders_status_icons_and_counts():
+    rendered = _render(
+        "SetTodoList",
+        {
+            "todos": [
+                {"title": "Write spec", "status": "done"},
+                {"title": "Implement", "status": "in_progress"},
+                {"title": "Test", "status": "pending"},
+            ]
+        },
+    )
+    assert "todos" in rendered
+    assert "1/3 done" in rendered
+    assert "Write spec" in rendered
+    assert "Implement" in rendered
+    assert "Test" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Web
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_renders_url():
+    rendered = _render("FetchURL", {"url": "https://example.com/page"}, output="<html>...")
+    assert "fetch" in rendered
+    assert "example.com" in rendered
+
+
+def test_search_renders_query_and_extras():
+    rendered = _render(
+        "SearchWeb",
+        {"query": "python typing", "limit": 10, "include_content": True},
+        output="result 1",
+    )
+    assert "search" in rendered
+    assert "python typing" in rendered
+    assert "limit 10" in rendered
+    assert "with content" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Background tasks
+# ---------------------------------------------------------------------------
+
+
+def test_task_list_renders_active_flag():
+    rendered = _render("TaskList", {"active_only": True}, output="task-1: running")
+    assert "tasks" in rendered
+    assert "(active)" in rendered
+
+
+def test_task_output_renders_id_and_block_flag():
+    rendered = _render(
+        "TaskOutput",
+        {"task_id": "abc-123", "block": True, "timeout": 60},
+        output="logs...",
+    )
+    assert "task output" in rendered
+    assert "abc-123" in rendered
+    assert "block" in rendered
+
+
+def test_task_stop_renders_id():
+    rendered = _render("TaskStop", {"task_id": "abc-123", "reason": "user requested"})
+    assert "task stop" in rendered
+    assert "abc-123" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Plan tools
+# ---------------------------------------------------------------------------
+
+
+def test_enter_plan_mode_renders():
+    rendered = _render("EnterPlanMode", {})
+    assert "plan mode" in rendered
+    assert "entering" in rendered
+
+
+def test_exit_plan_mode_renders_options():
+    rendered = _render(
+        "ExitPlanMode",
+        {
+            "options": [
+                {"label": "Refactor first"},
+                {"label": "Add tests first"},
+            ]
+        },
+    )
+    assert "plan mode" in rendered
+    assert "Refactor first" in rendered
+    assert "Add tests first" in rendered

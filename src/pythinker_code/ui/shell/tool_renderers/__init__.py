@@ -142,12 +142,19 @@ def register_builtin_renderers() -> None:
     that calls this once at startup when the Pi style is active.
     """
     from pythinker_code.ui.shell.tool_renderers import (
+        agent,
+        ask_user,
+        background,
         bash,
         edit,
         find,
         generic,
         grep,
+        plan,
         read,
+        think,
+        todo,
+        web,
         write,
     )
 
@@ -158,6 +165,17 @@ def register_builtin_renderers() -> None:
     register_tool_renderer(grep.GREP_RENDERER)
     register_tool_renderer(find.FIND_RENDERER)
     register_tool_renderer(bash.SHELL_RENDERER)
+    register_tool_renderer(agent.AGENT_RENDERER)
+    register_tool_renderer(ask_user.ASK_USER_RENDERER)
+    register_tool_renderer(think.THINK_RENDERER)
+    register_tool_renderer(todo.TODO_RENDERER)
+    register_tool_renderer(web.FETCH_RENDERER)
+    register_tool_renderer(web.SEARCH_RENDERER)
+    register_tool_renderer(background.TASK_LIST_RENDERER)
+    register_tool_renderer(background.TASK_OUTPUT_RENDERER)
+    register_tool_renderer(background.TASK_STOP_RENDERER)
+    register_tool_renderer(plan.ENTER_PLAN_RENDERER)
+    register_tool_renderer(plan.EXIT_PLAN_RENDERER)
 
 
 __all__ = [
