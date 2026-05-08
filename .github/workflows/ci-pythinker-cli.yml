@@ -96,6 +96,48 @@ jobs:
           PYTHONUTF8: "1"
         run: make test-pythinker-code
 
+  coverage:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          version: "0.8.5"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Prepare building environment
+        env:
+          UV_PYTHON: ${{ steps.setup-python.outputs.python-path }}
+        run: make prepare
+
+      - name: Run tests with coverage
+        env:
+          UV_PYTHON: ${{ steps.setup-python.outputs.python-path }}
+          PYTHONUTF8: "1"
+        run: make coverage-pythinker-code
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-pythinker-code
+          path: |
+            coverage.xml
+            htmlcov/
+          if-no-files-found: warn
+          retention-days: 14
+
   build:
     strategy:
       fail-fast: true

@@ -33,6 +33,12 @@ tests_ai/terminal_bench_2_cache/
 jobs/
 tests_ai/accuracy_smoke/*.tsv
 
+# Coverage reports
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
 # nix build result
 result
 result-*

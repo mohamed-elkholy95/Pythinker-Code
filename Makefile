@@ -111,6 +111,20 @@ test-pythinker-host: ## Run Pythinker Host tests.
 test-pythinker-sdk: ## Run pythinker-sdk tests.
 	@echo "==> Running pythinker-sdk tests"
 	@uv run --directory sdks/pythinker-sdk pytest tests -vv
+
+.PHONY: coverage coverage-pythinker-code
+coverage: coverage-pythinker-code ## Run Pythinker Code tests with coverage and emit XML + HTML reports.
+coverage-pythinker-code: ## Run Pythinker Code tests under coverage.py (XML + HTML output).
+	@echo "==> Running Pythinker Code tests with coverage"
+	@rm -f .coverage .coverage.* coverage.xml
+	@rm -rf htmlcov
+	@uv run coverage run --rcfile=pyproject.toml -m pytest tests
+	@uv run coverage run --rcfile=pyproject.toml --append -m pytest tests_e2e
+	@uv run coverage combine || true
+	@uv run coverage report
+	@uv run coverage xml
+	@uv run coverage html
+	@echo "==> Coverage HTML report written to htmlcov/index.html"
 .PHONY: build build-pythinker-code build-pythinker-core build-pythinker-host build-pythinker-sdk build-bin build-bin-onedir
 build: build-web build-vis build-pythinker-code build-pythinker-core build-pythinker-host build-pythinker-sdk ## Build Python packages for release.
 build-pythinker-code: build-web build-vis ## Build the pythinker-code sdist and wheel.

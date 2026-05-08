@@ -69,6 +69,7 @@ dev = [
     "ty>=0.0.9",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
+    "pytest-cov>=6.0.0",
     "ruff>=0.14.10",
 ]
 
@@ -151,3 +152,31 @@ datas = "datas"
 Seeked = "Seeked"
 seeked = "seeked"
 iterm = "iterm"
+
+[tool.coverage.run]
+branch = true
+source = ["pythinker_code"]
+parallel = true
+omit = [
+    "src/pythinker_code/deps/*",
+    "src/pythinker_code/prompts/*",
+    "tests/*",
+    "tests_e2e/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = [
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "@overload",
+    "pragma: no cover",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
