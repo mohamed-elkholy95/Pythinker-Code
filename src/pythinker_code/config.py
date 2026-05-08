@@ -175,6 +175,20 @@ class MCPClientConfig(BaseModel):
     """Timeout for tool calls in milliseconds."""
 
 
+class TUIConfig(BaseModel):
+    """TUI rendering style configuration."""
+
+    style: Literal["pythinker", "pi"] = Field(
+        default="pythinker",
+        description=(
+            "TUI rendering style. 'pythinker' (default) is the existing "
+            "worklog-based rendering. 'pi' opts into Pi-style tool cards "
+            "(in-progress migration). Override at runtime with the env var "
+            "PYTHINKER_TUI_STYLE=pi."
+        ),
+    )
+
+
 class MCPConfig(BaseModel):
     """MCP configuration."""
 
@@ -238,6 +252,7 @@ class Config(BaseModel):
     )
     services: Services = Field(default_factory=Services, description="Services configuration")
     mcp: MCPConfig = Field(default_factory=MCPConfig, description="MCP configuration")
+    tui: TUIConfig = Field(default_factory=TUIConfig, description="TUI rendering configuration")
     hooks: list[HookDef] = Field(default_factory=list, description="Hook definitions")  # pyright: ignore[reportUnknownVariableType]
     merge_all_available_skills: bool = Field(
         default=True,

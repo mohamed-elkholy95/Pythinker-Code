@@ -421,11 +421,22 @@ class Shell:
     async def run(self, command: str | None = None) -> bool:
         _run_start_time = time.monotonic()
 
-        # Initialize theme from config
+        # Initialize theme + TUI style from config
         if isinstance(self.soul, PythinkerSoul):
             from pythinker_code.ui.theme import set_active_theme
+            from pythinker_code.ui.tui_config import (
+                get_tui_style,
+                set_active_tui_style,
+            )
 
             set_active_theme(self.soul.runtime.config.theme)
+            set_active_tui_style(self.soul.runtime.config.tui.style)
+            if get_tui_style() == "pi":
+                from pythinker_code.ui.shell.tool_renderers import (
+                    register_builtin_renderers,
+                )
+
+                register_builtin_renderers()
 
         if command is not None:
             # run single command and exit
