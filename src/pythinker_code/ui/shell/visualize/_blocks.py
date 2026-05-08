@@ -589,19 +589,19 @@ class _ToolCallBlock:
     def _pi_result_text(result: ToolReturnValue) -> str:
         """Flatten a ToolReturnValue to a single text payload for Pi cards.
 
-        Prefers the ``brief`` display block (the same text shown on the
-        legacy worklog card), then falls back to ``message``, then to
-        ``output`` when that is a plain string. Non-string outputs are
-        skipped — renderers can pull richer detail from ``ctx.args``.
+        Pi tool renderers expect the *primary content* (file body, command
+        output, grep matches) — that lives in ``output`` for Pythinker.
+        Fall back to ``message`` (e.g. "Successfully wrote N bytes" from
+        WriteFile, where ``output`` is empty) and finally ``brief`` for
+        tools that only emit a summary block. Non-string outputs are
+        skipped here; specialized renderers should pull richer detail
+        from ``ctx.args``.
         """
-        brief = getattr(result, "brief", "") or ""
-        if brief:
-            return brief
+        if isinstance(result.output, str) and result.output:
+            return result.output
         if result.message:
             return result.message
-        if isinstance(result.output, str):
-            return result.output
-        return ""
+        return getattr(result, "brief", "") or ""
 
     @staticmethod
     def _extract_worklog_argument(arguments: str | None, tool_name: str) -> str | None:

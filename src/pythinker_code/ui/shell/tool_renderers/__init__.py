@@ -141,9 +141,23 @@ def register_builtin_renderers() -> None:
     has no side effects at import time — the host wiring layer is the one
     that calls this once at startup when the Pi style is active.
     """
-    from pythinker_code.ui.shell.tool_renderers import generic
+    from pythinker_code.ui.shell.tool_renderers import (
+        bash,
+        edit,
+        find,
+        generic,
+        grep,
+        read,
+        write,
+    )
 
     register_tool_renderer(generic.GENERIC_RENDERER)
+    register_tool_renderer(read.READ_RENDERER)
+    register_tool_renderer(write.WRITE_RENDERER)
+    register_tool_renderer(edit.EDIT_RENDERER)
+    register_tool_renderer(grep.GREP_RENDERER)
+    register_tool_renderer(find.FIND_RENDERER)
+    register_tool_renderer(bash.SHELL_RENDERER)
 
 
 __all__ = [
