@@ -18,6 +18,11 @@ class LazySubcommandGroup(typer.core.TyperGroup):
         "export": ("pythinker_code.cli.export", "cli", "Export session data."),
         "mcp": ("pythinker_code.cli.mcp", "cli", "Manage MCP server configurations."),
         "plugin": ("pythinker_code.cli.plugin", "cli", "Manage plugins."),
+        "update": (
+            "pythinker_code.cli.update",
+            "cli",
+            "Check for and install Pythinker CLI updates.",
+        ),
         "vis": ("pythinker_code.cli.vis", "cli", "Run Pythinker Agent Tracing Visualizer."),
         "web": ("pythinker_code.cli.web", "cli", "Run Pythinker CLI web interface."),
     }
@@ -26,6 +31,7 @@ class LazySubcommandGroup(typer.core.TyperGroup):
         "export",
         "mcp",
         "plugin",
+        "update",
         "vis",
         "web",
     )

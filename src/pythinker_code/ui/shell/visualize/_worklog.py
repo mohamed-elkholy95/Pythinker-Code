@@ -16,7 +16,7 @@ from pythinker_code.tools.display import (
 from pythinker_code.utils.rich.columns import BulletColumns
 from pythinker_code.utils.rich.diff_render import (
     collect_diff_hunks,
-    render_diff_panel,
+    render_diff_preview,
     render_diff_summary_panel,
 )
 from pythinker_code.utils.rich.markdown import Markdown
@@ -167,11 +167,17 @@ def render_display_blocks(
                 continue
             hunks, added_total, removed_total = collect_diff_hunks(diff_blocks)
             if hunks:
+                preview_lines, _ = render_diff_preview(
+                    path,
+                    hunks,
+                    added_total,
+                    removed_total,
+                    max_lines=8,
+                )
                 rendered.append(
                     render_worklog_card(
-                        f"Diff +{added_total} -{removed_total}",
-                        render_diff_panel(path, hunks, added_total, removed_total),
-                        subtitle=path,
+                        "Diff",
+                        Group(*preview_lines),
                     )
                 )
             continue

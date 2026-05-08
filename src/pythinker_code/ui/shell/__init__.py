@@ -35,7 +35,6 @@ from pythinker_code.soul import (
     run_soul,
 )
 from pythinker_code.soul.pythinkersoul import FLOW_COMMAND_PREFIX, PythinkerSoul
-from pythinker_code.ui.shell import update as _update_mod
 from pythinker_code.ui.shell.console import console
 from pythinker_code.ui.shell.echo import render_user_echo_text
 from pythinker_code.ui.shell.mcp_status import render_mcp_prompt
@@ -51,10 +50,8 @@ from pythinker_code.ui.shell.replay import replay_recent_history
 from pythinker_code.ui.shell.slash import SKILL_COMMAND_PREFIX, shell_mode_registry
 from pythinker_code.ui.shell.slash import registry as shell_slash_registry
 from pythinker_code.ui.shell.update import (
-    LATEST_VERSION_FILE,
     UpdateResult,
     do_update,
-    semver_tuple,
 )
 from pythinker_code.ui.shell.visualize import (
     ApprovalPromptDelegate,
@@ -1661,35 +1658,8 @@ def _print_welcome_info(name: str, info_items: list[WelcomeInfoItem]) -> None:
             tips_table.add_row("  › ", tip_text)
         rows.append(tips_table)
 
-    if LATEST_VERSION_FILE.exists():
-        from pythinker_code.constant import VERSION as current_version
-        from pythinker_code.ui.shell.update import SKIPPED_VERSION_FILE
-        from pythinker_code.utils.envvar import get_env_bool
-
-        if not get_env_bool("PYTHINKER_CLI_NO_AUTO_UPDATE"):
-            try:
-                latest_version = LATEST_VERSION_FILE.read_text(encoding="utf-8").strip()
-            except OSError:
-                latest_version = ""
-            if latest_version and semver_tuple(latest_version) > semver_tuple(current_version):
-                try:
-                    skipped = (
-                        SKIPPED_VERSION_FILE.read_text(encoding="utf-8").strip()
-                        if SKIPPED_VERSION_FILE.exists()
-                        else ""
-                    )
-                except OSError:
-                    skipped = ""
-                if skipped != latest_version:
-                    rows.append(
-                        Text.from_markup(
-                            f"\n[yellow]New version available: {latest_version}. "
-                            f"Please run `{_update_mod.UPGRADE_COMMAND}` to upgrade.[/yellow]"
-                        )
-                    )
-                    from pythinker_code.telemetry import track
-
-                    track("update_prompted", current=current_version, latest=latest_version)
+    # Update notice is rendered as a standalone banner above the welcome panel
+    # by `print_update_banner()` (called from app.py before this point).
 
     console.print(
         Panel(

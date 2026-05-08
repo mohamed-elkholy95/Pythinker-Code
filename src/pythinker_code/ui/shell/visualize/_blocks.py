@@ -446,7 +446,20 @@ class _ToolCallBlock:
                 )
             )
 
-        if self._n_finished_subagent_tool_calls > MAX_SUBAGENT_TOOL_CALLS_TO_SHOW:
+        style = tool_style(self._tool_name)
+        if style.label == "Subagent" and self._result is not None:
+            if self._n_finished_subagent_tool_calls:
+                summary = Text(
+                    f"{self._n_finished_subagent_tool_calls} tool calls completed",
+                    style="grey50",
+                )
+                if self._finished_subagent_tool_calls:
+                    summary.append(
+                        f" · {len(self._finished_subagent_tool_calls)} recent tracked",
+                        style="grey50",
+                    )
+                children.append(BulletColumns(summary, bullet_style="grey50"))
+        elif self._n_finished_subagent_tool_calls > MAX_SUBAGENT_TOOL_CALLS_TO_SHOW:
             n_hidden = self._n_finished_subagent_tool_calls - MAX_SUBAGENT_TOOL_CALLS_TO_SHOW
             children.append(
                 BulletColumns(
@@ -457,27 +470,29 @@ class _ToolCallBlock:
                     bullet_style="grey50",
                 )
             )
-        for sub_call, sub_result in self._finished_subagent_tool_calls:
-            argument = extract_key_argument(
-                sub_call.function.arguments or "", sub_call.function.name
-            )
-            sub_url = self._extract_full_url(sub_call.function.arguments, sub_call.function.name)
-            sub_text = Text()
-            sub_text.append("Used ")
-            sub_text.append(sub_call.function.name, style="blue")
-            if argument:
-                sub_text.append(" (", style="grey50")
-                arg_style = Style(color="grey50", link=sub_url) if sub_url else "grey50"
-                sub_text.append(argument, style=arg_style)
-                sub_text.append(")", style="grey50")
-            children.append(
-                BulletColumns(
-                    sub_text,
-                    bullet_style="green" if not sub_result.is_error else "dark_red",
+        if not (style.label == "Subagent" and self._result is not None):
+            for sub_call, sub_result in self._finished_subagent_tool_calls:
+                argument = extract_key_argument(
+                    sub_call.function.arguments or "", sub_call.function.name
                 )
-            )
+                sub_url = self._extract_full_url(
+                    sub_call.function.arguments, sub_call.function.name
+                )
+                sub_text = Text()
+                sub_text.append("Used ")
+                sub_text.append(sub_call.function.name, style="blue")
+                if argument:
+                    sub_text.append(" (", style="grey50")
+                    arg_style = Style(color="grey50", link=sub_url) if sub_url else "grey50"
+                    sub_text.append(argument, style=arg_style)
+                    sub_text.append(")", style="grey50")
+                children.append(
+                    BulletColumns(
+                        sub_text,
+                        bullet_style="green" if not sub_result.is_error else "dark_red",
+                    )
+                )
 
-        style = tool_style(self._tool_name)
         if self._result is None:
             return render_worklog_entry(
                 label=style.label,

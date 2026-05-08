@@ -703,9 +703,9 @@ class PythinkerCLI:
         from pythinker_code.ui.shell import Shell, WelcomeInfoItem
 
         if command is None:
-            from pythinker_code.ui.shell.update import check_update_gate
+            from pythinker_code.ui.shell.update import print_update_banner
 
-            check_update_gate()
+            print_update_banner()
 
         welcome_info = [
             WelcomeInfoItem(

@@ -1643,7 +1643,7 @@ class CustomPromptSession:
         )
         if isinstance(buffer_container.content, Window):
             buffer_window = buffer_container.content
-            buffer_window.height = Dimension(preferred=2, max=2)
+            buffer_window.height = Dimension(min=1, max=5)
             buffer_window.dont_extend_height = Condition(lambda: True)
             buffer_window.style = "class:compact-input"
         self._prompt_buffer_container = buffer_container

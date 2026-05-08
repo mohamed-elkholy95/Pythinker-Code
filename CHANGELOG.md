@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Update notifier: standalone "Update Available" banner shown above the welcome panel when a newer release is on PyPI; suppressed by `PYTHINKER_CLI_NO_AUTO_UPDATE=1`.
+- New `pythinker update` subcommand (`--check` for a non-installing check) that auto-detects the install method (`uv tool`, `pipx`, or `pip`) and runs the matching upgrade command.
+
 ## 1.0.0 (2026-05-06)
 
 Initial release of Pythinker CLI.

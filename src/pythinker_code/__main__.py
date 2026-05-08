@@ -46,6 +46,7 @@ Commands:
   export   Export session data.
   mcp      Manage MCP server configurations.
   plugin   Manage plugins.
+  update   Check for and install Pythinker CLI updates.
   vis      Run Pythinker Agent Tracing Visualizer.
   web      Run Pythinker CLI web interface.
 

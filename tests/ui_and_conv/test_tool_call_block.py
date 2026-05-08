@@ -7,6 +7,7 @@ from pythinker_core.tooling import ToolError, ToolOk
 from rich.console import Console
 
 from pythinker_code.ui.shell.visualize import _ToolCallBlock
+from pythinker_code.wire.types import ToolResult
 
 
 def _plain(renderable) -> str:
@@ -17,6 +18,10 @@ def _plain(renderable) -> str:
 
 def _tool_call(name: str, arguments: str = "{}") -> ToolCall:
     return ToolCall(id=f"tc-{name}", function=ToolCall.FunctionBody(name=name, arguments=arguments))
+
+
+def _tool_call_with_id(call_id: str, name: str, arguments: str = "{}") -> ToolCall:
+    return ToolCall(id=call_id, function=ToolCall.FunctionBody(name=name, arguments=arguments))
 
 
 class TestExtractFullUrl:
@@ -122,3 +127,25 @@ def test_tool_call_block_renders_display_cards_under_completed_entry():
     assert "Shell" in output
     assert "Report" in output
     assert "Tests passed" in output
+
+
+def test_completed_subagent_renders_compact_summary():
+    block = _ToolCallBlock(_tool_call("Agent", '{"description":"Audit UI"}'))
+    block.set_subagent_metadata("a143aa989", "explore")
+    for index in range(7):
+        call = _tool_call_with_id(
+            f"sub-{index}",
+            "ReadFile",
+            json.dumps({"path": f"web/src/components/file-{index}.tsx"}),
+        )
+        block.append_sub_tool_call(call)
+        block.finish_sub_tool_call(ToolResult(tool_call_id=call.id, return_value=ToolOk(output="")))
+
+    block.finish(ToolOk(output=""))
+    output = _plain(block.compose())
+
+    assert "Subagent" in output
+    assert "completed" in output.lower()
+    assert "7 tool calls" in output
+    assert output.count("Used ReadFile") <= 3
+    assert "more tool" not in output.lower()

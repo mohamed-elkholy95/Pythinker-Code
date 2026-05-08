@@ -143,3 +143,19 @@ def test_consecutive_diff_blocks_for_same_file_render_one_card():
     assert "src/app.py" in output
     assert "+" in output
     assert "-" in output
+
+
+def test_diff_blocks_render_compact_summary_first_card():
+    cards = render_display_blocks(
+        [
+            DiffDisplayBlock(path="src/app.py", old_text="a\nb", new_text="a\nb\nc"),
+            DiffDisplayBlock(path="src/app.py", old_text="x", new_text="y"),
+        ]
+    )
+    output = _plain(cards[0])
+
+    assert len(cards) == 1
+    assert "src/app.py" in output
+    assert "+2" in output
+    assert "-1" in output
+    assert "Diff +" not in output

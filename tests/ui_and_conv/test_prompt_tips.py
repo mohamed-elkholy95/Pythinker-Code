@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from collections.abc import Callable
@@ -666,7 +667,7 @@ def test_modal_prompt_hides_input_buffer_when_text_input_is_not_allowed() -> Non
     assert prompt_session._should_render_input_buffer() is False
 
 
-def test_prompt_buffer_window_is_limited_to_two_visible_rows() -> None:
+def test_prompt_buffer_window_can_grow_to_five_visible_rows() -> None:
     prompt_session = CustomPromptSession(
         status_provider=lambda: StatusSnapshot(context_usage=0.0),
         model_capabilities=set(),
@@ -681,9 +682,43 @@ def test_prompt_buffer_window_is_limited_to_two_visible_rows() -> None:
     assert isinstance(buffer_window, shell_prompt.Window)
 
     assert buffer_window.dont_extend_height() is True
-    assert buffer_window.height.preferred == 2
-    assert buffer_window.height.max == 2
+    assert buffer_window.height.min == 1
+    assert buffer_window.height.max == 5
     assert buffer_window.style == "class:compact-input"
+
+
+@pytest.mark.asyncio
+async def test_prompt_buffer_expands_for_long_pasted_prompt() -> None:
+    prompt_session = CustomPromptSession(
+        status_provider=lambda: StatusSnapshot(context_usage=0.0),
+        model_capabilities=set(),
+        model_name=None,
+        thinking=False,
+        agent_mode_slash_commands=[],
+        shell_mode_slash_commands=[],
+    )
+
+    assert prompt_session._prompt_buffer_container is not None
+    buffer_window = prompt_session._prompt_buffer_container.content
+    assert isinstance(buffer_window, shell_prompt.Window)
+
+    prompt_session._suppress_auto_completion = True
+    prompt_session._session.default_buffer.text = (
+        "Review this codebase as a senior product designer and front-end UI auditor. "
+        "Identify all UI improvements that would make the product more polished, modern, "
+        "usable, and consistent. Inspect pages, components, styles, and user flows. "
+        "Return a full categorized audit covering visual design, spacing, typography, "
+        "colors, accessibility, responsiveness, navigation, component reuse, and "
+        "interaction states. For each recommendation, provide the exact issue, why it "
+        "matters, the suggested improvement, priority, and effort. Separate the output into:\n\n"
+        "Quick wins\n\nModerate improvements\n\nHigh-impact strategic UI changes"
+    )
+
+    await asyncio.sleep(0)
+    preferred_height = buffer_window.preferred_height(width=92, max_available_height=20)
+
+    assert preferred_height.preferred == 5
+    assert preferred_height.max == 5
 
 
 def test_slash_menu_layout_sits_below_compact_agent_input() -> None:
