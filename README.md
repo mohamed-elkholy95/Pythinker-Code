@@ -157,16 +157,19 @@ Swap providers and models per-session: `--model openai/gpt-5.5`, hosted Pythinke
 ### ✨ Recommended install (clean, with logo)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mohamed-elkholy95/Pythinker-Code/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mohamed-elkholy95/Pythinker-Code/main/scripts/install.sh | bash
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/mohamed-elkholy95/Pythinker-Code/main/scripts/install.ps1 | iex
+$installer = Join-Path $env:TEMP "pythinker-install.ps1"
+iwr -UseBasicParsing https://raw.githubusercontent.com/mohamed-elkholy95/Pythinker-Code/main/scripts/install.ps1 -OutFile $installer
+& $installer
+Remove-Item $installer
 ```
 
-The installer fetches `uv` if missing, installs `pythinker-code` quietly, and prints a single-line confirmation instead of the full dependency wall.
+The installer fetches `uv` if missing, installs `pythinker-code` quietly, and prints a single-line confirmation instead of the full dependency wall. Windows downloads the script to a file (instead of `irm ... | iex`) so PowerShell antivirus scanning is less likely to block it, but it is invoked with `&` in the current session so PATH updates from `uv` are immediately visible — `pythinker` works without opening a new shell.
 
 ### 🚀 One-off run with `uvx`
 
