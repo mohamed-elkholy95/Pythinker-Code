@@ -48,7 +48,17 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
-## 🆕 What's New in 2.1.0
+## 🆕 What's New in 2.1.1
+
+Documentation refresh + CI hardening on top of 2.1.0.
+
+- **PyPI page rendering** — README image and key file links converted to absolute GitHub URLs so the project page on PyPI renders the logo, demo GIFs, and architecture diagram correctly.
+- **Type-checking on Python 3.14** — `@asynccontextmanager` / `@contextmanager` helpers now use `AsyncGenerator` / `Generator` return annotations; container-walk attribute access is properly cast; selector test helpers narrow `SelectorHeader | SelectorItem` unions.
+- **`render_plain`** — no longer hits Rich's `is_dumb_terminal` size override (CI sets `TERM=dumb`); the explicit `width=` argument is honored everywhere.
+- **License section** — corrected from MIT to Apache-2.0 (matches `pyproject.toml` and the existing badge).
+- **CI cleanup** — `release-validate` step now points at the root `pyproject.toml`; PTY-based e2e tests skip on GitHub Actions runners (chronic `prompt_toolkit` hang); typos allowlist for verbatim CLI output.
+
+### Carried forward from 2.1.0
 
 A focused refresh of the TUI and slash-command UX.
 
@@ -60,7 +70,7 @@ A focused refresh of the TUI and slash-command UX.
 - **Prompt templates** — discovery is now `~/.pythinker/prompts` and `<project>/.pythinker/prompts`. The legacy directory lookup has been retired.
 - **TUI style flag** — only `card` (default) and `pythinker` are accepted; the legacy alias has been dropped.
 
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code`.
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.1.1`.
 
 ---
 
