@@ -48,7 +48,15 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
-## 🆕 What's New in 2.1.2
+## 🆕 What's New in 2.2.0
+
+Animated installer + Windows PATH automation, on top of 2.1.2.
+
+- **Tetris-style logo animation** — both `scripts/install.sh` and `scripts/install.ps1` now build the robot-head logo piece-by-piece (walls → top bar → bottom bar → eyes → ears → antenna), settling into the final mark before the install proceeds. Falls back gracefully to the existing static logo when the terminal isn't interactive (`CI=1`, `NO_COLOR`, `TERM=dumb`, redirected stdout, or `PYTHINKER_NO_ANIMATION=1`).
+- **Animation tunables** — `PYTHINKER_LOGO_FRAME_DELAY` / `PYTHINKER_LOGO_STAGGER_DELAY` (bash, seconds) and `PYTHINKER_LOGO_FRAME_DELAY_MS` / `PYTHINKER_LOGO_STAGGER_DELAY_MS` (PowerShell, milliseconds) let you slow down or speed up playback.
+- **Windows: idempotent User PATH write** — `install.ps1` now appends `~/.local/bin` to your User PATH via the registry (`[Environment]::SetEnvironmentVariable`) and broadcasts `WM_SETTINGCHANGE` so future shells pick it up. Re-running the installer is a no-op if the directory is already present.
+
+### Carried forward from 2.1.2
 
 Windows installer fix on top of 2.1.1.
 
@@ -78,7 +86,7 @@ A focused refresh of the TUI and slash-command UX.
 - **Prompt templates** — discovery is now `~/.pythinker/prompts` and `<project>/.pythinker/prompts`. The legacy directory lookup has been retired.
 - **TUI style flag** — only `card` (default) and `pythinker` are accepted; the legacy alias has been dropped.
 
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.1.2`.
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.2.0`.
 
 ---
 

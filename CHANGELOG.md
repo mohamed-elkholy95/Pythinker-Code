@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 2.2.0 (2026-05-09)
+
+Installer UX: animated logo + Windows PATH automation.
+
+- `scripts/install.sh`: Tetris-style logo animation. Pieces (walls, bars, eyes, ears, antenna) fall from above the canvas one at a time and settle into the robot head before install proceeds. Static logo remains the fallback for non-TTY / `NO_COLOR` / `TERM=dumb` / `CI=1` / `PYTHINKER_NO_ANIMATION=1`. Tunables: `PYTHINKER_LOGO_FRAME_DELAY` and `PYTHINKER_LOGO_STAGGER_DELAY` (seconds).
+- `scripts/install.ps1`: same animation, PowerShell port. Tunables: `PYTHINKER_LOGO_FRAME_DELAY_MS` and `PYTHINKER_LOGO_STAGGER_DELAY_MS` (milliseconds).
+- `scripts/install.ps1`: idempotently append `$USERPROFILE\.local\bin` to the User PATH via `[Environment]::SetEnvironmentVariable` and broadcast `WM_SETTINGCHANGE` so future shells (and Explorer-spawned children) pick up the new PATH automatically. No-op when the directory is already present.
+- `scripts/install.ps1`: force `[Console]::OutputEncoding = UTF8` so the box-drawing characters render correctly on Windows hosts.
+
 ## 2.1.2 (2026-05-09)
 
 Windows installer fix.
