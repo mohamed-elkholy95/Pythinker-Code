@@ -48,7 +48,15 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
-## 🆕 What's New in 2.1.1
+## 🆕 What's New in 2.1.2
+
+Windows installer fix on top of 2.1.1.
+
+- **Windows installer runs in the current shell** — `scripts/install.ps1` is now invoked via `& $installer` instead of a `powershell -File` subprocess, and the bundled `uv` bootstrap is dot-sourced inside an anonymous scope. PATH updates from `uv` now land in the calling PowerShell session, so `uv`, `uvx`, and `pythinker` are immediately runnable after the installer finishes — no "Open a new shell" dance.
+- **Diagnostic fallback** — if `pythinker` is somehow still not on PATH (e.g., the script was deliberately run as a subprocess), the installer now prints the absolute path to the shim and tells you what to do.
+- **Regression tests** — `tests/test_installation_docs.py` locks in the current-session invocation and the dot-sourced `uv` bootstrap.
+
+### Carried forward from 2.1.1
 
 Documentation refresh + CI hardening on top of 2.1.0.
 
@@ -70,7 +78,7 @@ A focused refresh of the TUI and slash-command UX.
 - **Prompt templates** — discovery is now `~/.pythinker/prompts` and `<project>/.pythinker/prompts`. The legacy directory lookup has been retired.
 - **TUI style flag** — only `card` (default) and `pythinker` are accepted; the legacy alias has been dropped.
 
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.1.1`.
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.1.2`.
 
 ---
 
