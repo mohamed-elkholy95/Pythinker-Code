@@ -151,3 +151,5 @@ datas = "datas"
 Seeked = "Seeked"
 seeked = "seeked"
 iterm = "iterm"
+# Verbatim pyright CLI output ("0 informations") quoted in docs.
+informations = "informations"
