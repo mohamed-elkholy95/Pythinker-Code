@@ -154,6 +154,7 @@ def test_pyinstaller_hiddenimports():
             "pythinker_code.cli.info",
             "pythinker_code.cli.mcp",
             "pythinker_code.cli.plugin",
+            "pythinker_code.cli.update",
             "pythinker_code.cli.vis",
             "pythinker_code.cli.web",
             "pythinker_code.tools",
