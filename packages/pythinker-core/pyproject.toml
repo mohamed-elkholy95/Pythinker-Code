@@ -78,6 +78,12 @@ select = [
     "I",   # isort
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# inline_snapshot auto-generates `snapshot(...)` bodies that can exceed
+# line-length when nested dicts collapse onto a single line. They are
+# mechanically-managed and not meant to be hand-wrapped.
+"tests/api_snapshot_tests/*.py" = ["E501"]
+
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
