@@ -140,7 +140,10 @@ class EnterPlanMode(CallableTool2[Params]):
                 "Do NOT call this tool again.",
                 brief="Client unsupported",
             )
-        except Exception:
+        except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="tool.plan.enter", tool="EnterPlanMode")
             logger.exception("Failed to get user response for EnterPlanMode")
             return ToolError(
                 message="Failed to get user response.",

@@ -123,6 +123,9 @@ class Shell(CallableTool2[Params]):
                 brief=f"Killed by timeout ({params.timeout}s)",
             )
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="tool.shell.exec", tool="Shell")
             logger.error(
                 "Shell command execution failed: {command}: {error}",
                 command=params.command,
@@ -166,6 +169,9 @@ class Shell(CallableTool2[Params]):
                 cwd=str(self._runtime.session.work_dir),
             )
         except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="tool.shell.background_start", tool="Shell")
             logger.error(
                 "Failed to start background shell task: {command}: {error}",
                 command=params.command,

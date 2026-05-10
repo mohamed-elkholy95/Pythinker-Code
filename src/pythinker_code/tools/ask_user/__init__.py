@@ -135,7 +135,10 @@ class AskUserQuestion(CallableTool2[Params]):
                 ),
                 brief="Client unsupported",
             )
-        except Exception:
+        except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="tool.ask_user", tool="AskUser")
             logger.exception("Failed to get user response for question %s", request.id)
             return ToolError(
                 message="Failed to get user response.",

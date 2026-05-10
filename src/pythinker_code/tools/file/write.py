@@ -170,6 +170,9 @@ class WriteFile(CallableTool2[Params]):
             )
 
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="tool.write", tool="WriteFile")
             logger.warning("WriteFile failed: {path}: {error}", path=params.path, error=e)
             return ToolError(
                 message=f"Failed to write to {params.path}. Error: {e}",
