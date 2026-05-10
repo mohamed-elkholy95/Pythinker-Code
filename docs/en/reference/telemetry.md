@@ -1,0 +1,124 @@
+# Telemetry & error reporting
+
+Pythinker Code emits anonymous telemetry to help us spot crashes, regressions
+and silent failures. This page documents exactly what's collected, where it's
+sent, and how to opt out.
+
+## Backends
+
+| Stack | Endpoint | What it carries |
+|---|---|---|
+| **OpenTelemetry → SigNoz** (logs / metrics / traces) | `https://otel.pythinker.com` | Structured events emitted via `track(...)`, periodic metric snapshots, and (when sampled) trace spans. |
+| **Sentry-compatible Bugsink** (errors) | `https://errors.pythinker.com/1` | Unhandled exceptions, asyncio task failures, and explicitly-reported handled exceptions. |
+| **Hosted feedback endpoint** | `<platform>/feedback` | Free-form text submitted via the `/feedback` slash command. |
+
+The OTel collector and Bugsink are pythinker-operated. The OTel ingest token
+embedded in the binary is public by design (same pattern used by Datadog RUM
+and PostHog public keys); rate limiting and PII scrubbing happen server-side
+at the collector edge.
+
+## What's collected
+
+### OTel events
+
+Emitted from `pythinker_code.telemetry.track(event_name, **properties)`. Every
+event carries:
+
+| Field | Source |
+|---|---|
+| `event_id` | UUIDv4 generated client-side. |
+| `device_id` | Stable per-install hash (no user identity). |
+| `session_id` | Per-process random ID. |
+| `event` | The event name (e.g. `session_started`, `feedback_submitted`, `error`). |
+| `properties.*` | Primitive enum-like attributes the call site passed. |
+| `context.*` | Static attributes added by the sink (version, OS, Python, locale). |
+| `timestamp` | Wall-clock time on the client. |
+
+Property values **must** be primitives (bool/int/float/str/None). The call
+sites are coded to never pass user input, file paths, or code snippets.
+
+### Sentry events
+
+Emitted from `pythinker_code.telemetry.sentry.capture_exception(exc)` (and
+implicitly via `sys.excepthook` and the asyncio exception handler). Carries:
+
+- Exception class, message, and stack trace.
+- Release tag (`pythinker-code@<version>`).
+- Lifecycle phase (`startup` / `runtime` / `shutdown`).
+- A handful of static tags (`ui_mode`, `model`).
+
+The `before_send` hook in `telemetry/sentry.py`:
+
+- Strips file-path prefixes above `site-packages/` or `pythinker_code/`,
+  collapsing them to `<env>/` so home directories don't leak.
+- Removes `server_name` (which is usually the user's hostname).
+- Disables `send_default_pii` and request-frame variable capture.
+
+### Reported handled errors
+
+`pythinker_code.telemetry.errors.report_handled_error(exc, *, site, tool=None, **attrs)`
+is the canonical helper for any `except Exception:` block that catches an
+exception, renders a graceful failure to the user (`ToolError`, red TUI line,
+warning), and currently has no monitoring visibility.
+
+It:
+
+1. Emits an OTel `error` event with `{site, exc_class, tool, **attrs}`.
+2. Calls `sentry.capture_exception(exc)`.
+
+Both calls are wrapped in `contextlib.suppress(Exception)` so monitoring can
+never break the host program.
+
+Common `site` values (extend with care — these are dashboard query keys):
+
+| Site | Where |
+|---|---|
+| `tool.read` | `tools/file/read.py` |
+| `tool.read_media` | `tools/file/read_media.py` |
+| `tool.write` | `tools/file/write.py` |
+| `tool.replace` | `tools/file/replace.py` |
+| `tool.glob` | `tools/file/glob.py` |
+| `tool.grep` | `tools/file/grep_local.py` |
+| `tool.shell.exec` | `tools/shell/__init__.py` (foreground command) |
+| `tool.shell.background_start` | `tools/shell/__init__.py` (background spawn) |
+| `tool.agent.foreground` | `tools/agent/__init__.py` |
+| `tool.ask_user` | `tools/ask_user/__init__.py` |
+| `tool.plan.enter` | `tools/plan/enter.py` |
+| `tool.plan.exit` | `tools/plan/__init__.py` |
+
+When you add a new catch site, prefer reusing an existing prefix and add a
+specific suffix. Do not put free-form messages in `site` — it must remain a
+small, stable enumeration for dashboard slicing.
+
+### `/feedback` slash command
+
+Distinct from automatic telemetry. The user types feedback explicitly; it is
+POSTed to the hosted feedback endpoint along with `session_id`, version, OS,
+and current model. No code or file context is attached.
+
+## Opting out
+
+Set either of the following before launching `pythinker`:
+
+- `PYTHINKER_DISABLE_TELEMETRY=1` — kills both Sentry and OTel emission for
+  the process. The `/feedback` slash command is **not** affected (it only
+  fires on explicit user invocation).
+- `config.telemetry = false` in your config file (TOML) — same effect.
+
+Override individual endpoints when running your own collectors:
+
+| Variable | Default |
+|---|---|
+| `PYTHINKER_SENTRY_DSN` | `https://...@errors.pythinker.com/1` |
+| `PYTHINKER_OTEL_ENDPOINT` | `https://otel.pythinker.com` |
+| `PYTHINKER_OTEL_TOKEN` | (embedded) |
+
+## What's *not* collected
+
+- Prompts, completions, or any LLM input/output.
+- File contents, paths above `site-packages/` (Sentry path-scrubbing), or
+  command arguments.
+- Local environment variable values.
+- The user's hostname or username.
+- Anything from the `/feedback` slash command unless the user explicitly
+  typed it.

@@ -151,6 +151,9 @@ class Glob(CallableTool2[Params]):
             )
 
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="tool.glob", tool="Glob")
             logger.warning(
                 "Glob failed: pattern={pattern}: {error}", pattern=params.pattern, error=e
             )

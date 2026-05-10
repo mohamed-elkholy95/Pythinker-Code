@@ -577,6 +577,9 @@ class Grep(CallableTool2[Params]):
         except asyncio.CancelledError:
             raise
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="tool.grep", tool="Grep")
             logger.warning(
                 "Grep failed: pattern={pattern}, path={path}: {error}",
                 pattern=params.pattern,

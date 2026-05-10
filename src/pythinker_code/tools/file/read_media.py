@@ -210,6 +210,9 @@ class ReadMediaFile(CallableTool2[Params]):
 
             return await self._read_media(p, file_type)
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="tool.read_media", tool="ReadMediaFile")
             logger.warning("ReadMediaFile failed: {path}: {error}", path=params.path, error=e)
             return ToolError(
                 message=f"Failed to read {params.path}. Error: {e}",

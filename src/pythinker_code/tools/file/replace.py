@@ -188,6 +188,9 @@ class StrReplaceFile(CallableTool2[Params]):
             )
 
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="tool.replace", tool="StrReplaceFile")
             logger.warning("StrReplaceFile failed: {path}: {error}", path=params.path, error=e)
             return ToolError(
                 message=f"Failed to edit. Error: {e}",
