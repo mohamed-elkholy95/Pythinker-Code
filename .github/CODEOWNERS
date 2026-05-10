@@ -1,0 +1,30 @@
+# CODEOWNERS — automatic review-request routing.
+#
+# Listing files here means GitHub auto-requests a review from the listed
+# owner whenever a PR touches them. Combined with the `dependabot-approved`
+# required status check (.github/workflows/dependabot-review-required.yml),
+# this ensures dependency bumps cannot merge without an explicit human pass
+# on the diff — particularly lockfile churn that has historically masked
+# breaking-change regressions (e.g. pydantic 2.13 alias serialization).
+
+# Default fallback: project owner reviews everything not matched below.
+*                                @mohamed-elkholy95
+
+# Dependency surfaces: explicit owner.
+pyproject.toml                   @mohamed-elkholy95
+uv.lock                          @mohamed-elkholy95
+**/pyproject.toml                @mohamed-elkholy95
+**/uv.lock                       @mohamed-elkholy95
+package.json                     @mohamed-elkholy95
+package-lock.json                @mohamed-elkholy95
+**/package.json                  @mohamed-elkholy95
+**/package-lock.json             @mohamed-elkholy95
+
+# Telemetry & monitoring config — contractual changes need a closer look.
+src/pythinker_code/telemetry/    @mohamed-elkholy95
+docs/en/reference/telemetry.md   @mohamed-elkholy95
+
+# CI workflows — branch protection / required-status-check changes shouldn't
+# slip in unnoticed.
+.github/workflows/               @mohamed-elkholy95
+.github/CODEOWNERS               @mohamed-elkholy95
