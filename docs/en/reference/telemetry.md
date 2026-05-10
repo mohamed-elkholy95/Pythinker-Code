@@ -85,6 +85,42 @@ Common `site` values (extend with care — these are dashboard query keys):
 | `tool.ask_user` | `tools/ask_user/__init__.py` |
 | `tool.plan.enter` | `tools/plan/enter.py` |
 | `tool.plan.exit` | `tools/plan/__init__.py` |
+| `auth.keyring.read` | `auth/oauth.py` (`_load_from_keyring`) |
+| `auth.oauth.device_authorize` | `auth/oauth.py` (device-code request) |
+| `auth.oauth.device_poll` | `auth/oauth.py` (device-code poll loop) |
+| `auth.models.fetch` | `auth/oauth.py` (`list_models` post-login) |
+| `auth.oauth.refresh` | `auth/oauth.py` (foreground token refresh) |
+| `auth.oauth.refresh.background` | `auth/oauth.py` (background refresh loop) |
+| `auth.platforms.refresh.pre_sync` | `auth/platforms.py` (pre-sync refresh) |
+| `auth.platforms.refresh.after_401` | `auth/platforms.py` (refresh-on-401) |
+| `auth.platforms.sync` | `auth/platforms.py` (model sync fallback) |
+| `auth.openai.discover_chatgpt_models` | `auth/openai.py` |
+| `auth.openai.browser_login` | `auth/openai.py` |
+| `auth.openai.device_start` | `auth/openai.py` |
+| `auth.openai.device_poll` | `auth/openai.py` |
+| `soul.btw.execute` | `soul/btw.py` (side question) |
+| `soul.btw.run_wire` | `soul/btw.py` (wire-based side question) |
+| `soul.toolset.register_external` | `soul/toolset.py` (external tool registration) |
+| `soul.toolset.mcp.connect` | `soul/toolset.py` (MCP server connect) |
+| `soul.toolset.mcp.call` | `soul/toolset.py` (MCP tool call) |
+| `soul.toolset.mcp.call.timeout` | `soul/toolset.py` (MCP tool call — timeout-classified) |
+| `soul.toolset.external_tool` | `soul/toolset.py` (`WireExternalTool`) |
+| `soul.injection.get` | `soul/pythinkersoul.py` (injection provider get) |
+| `soul.injection.on_context_compacted` | `soul/pythinkersoul.py` |
+| `soul.injection.on_auto_changed` | `soul/pythinkersoul.py` |
+| `soul.context.compact` | `soul/pythinkersoul.py` (compaction inside step) |
+| `soul.step.error` | `soul/pythinkersoul.py` (any step exception) |
+| `soul.chat.recover` | `soul/pythinkersoul.py` (provider recovery) |
+| `acp.session.prompt` | `acp/session.py` |
+| `acp.session.approval` | `acp/session.py` |
+| `acp.host.terminal` | `acp/host.py` |
+| `hooks.runner` | `hooks/runner.py` |
+| `hooks.engine.run` | `hooks/engine.py` (top-level fail-open wrap) |
+| `hooks.engine.triggered_cb` | `hooks/engine.py` (HookTriggered callback) |
+| `hooks.engine.resolved_cb` | `hooks/engine.py` (HookResolved callback) |
+| `hooks.engine.wire` | `hooks/engine.py` (wire hook dispatch) |
+| `subagents.run.soul` | `subagents/runner.py` (soul-run wrapper) |
+| `subagents.run.background` | `subagents/runner.py` (background failure) |
 
 When you add a new catch site, prefer reusing an existing prefix and add a
 specific suffix. Do not put free-form messages in `site` — it must remain a

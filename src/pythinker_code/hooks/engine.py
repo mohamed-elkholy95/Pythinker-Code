@@ -237,7 +237,10 @@ class HookEngine:
             results = await self._execute_hooks(
                 event, matcher_value, server_matched, wire_matched, input_data
             )
-        except Exception:
+        except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="hooks.engine.run")
             logger.warning("Hook engine error for {}, failing open", event)
             return []
 
@@ -278,6 +281,9 @@ class HookEngine:
             try:
                 self._on_triggered(event, matcher_value, total)
             except Exception as e:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(e, site="hooks.engine.triggered_cb")
                 logger.warning(
                     "HookTriggered callback failed for {event}: {error}, continuing",
                     event=event,
@@ -328,6 +334,9 @@ class HookEngine:
             try:
                 self._on_resolved(event, matcher_value, action, reason, duration_ms)
             except Exception as e:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(e, site="hooks.engine.resolved_cb")
                 logger.warning(
                     "HookResolved callback failed for {event}: {error}, continuing",
                     event=event,
@@ -366,6 +375,9 @@ class HookEngine:
             logger.warning("Wire hook timed out: {} {}", event, target)
             return HookResult(action="allow", timed_out=True)
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="hooks.engine.wire")
             hook_task.cancel()
             logger.warning("Wire hook failed: {} {}: {}", event, target, e)
             return HookResult(action="allow")

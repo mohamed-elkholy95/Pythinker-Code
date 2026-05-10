@@ -319,6 +319,9 @@ class PythinkerToolset:
                 parameters=parameters,
             )
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="soul.toolset.register_external")
             return False, str(e)
         self.add(tool)
         return True, None
@@ -490,6 +493,9 @@ class PythinkerToolset:
                 logger.info("Connected MCP server: {server_name}", server_name=server_name)
                 return server_name, None
             except Exception as e:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(e, site="soul.toolset.mcp.connect")
                 logger.error(
                     "Failed to connect MCP server: {server_name}, error: {error}",
                     server_name=server_name,
@@ -635,9 +641,12 @@ class MCPTool[T: ClientTransport](CallableTool):
                     )
                 return convert_mcp_tool_result(result)
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
             # fastmcp raises `RuntimeError` on timeout and we cannot tell it from other errors
             exc_msg = str(e).lower()
             if "timeout" in exc_msg or "timed out" in exc_msg:
+                report_handled_error(e, site="soul.toolset.mcp.call.timeout", tool="MCP")
                 logger.warning(
                     "MCP tool call timed out: {tool_name}: {error}",
                     tool_name=self._mcp_tool.name,
@@ -650,6 +659,7 @@ class MCPTool[T: ClientTransport](CallableTool):
                     ),
                     brief="Timeout",
                 )
+            report_handled_error(e, site="soul.toolset.mcp.call", tool="MCP")
             logger.error(
                 "MCP tool call failed: {tool_name}: {error}",
                 tool_name=self._mcp_tool.name,
@@ -693,6 +703,9 @@ class WireExternalTool(CallableTool):
         except asyncio.CancelledError:
             raise
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="soul.toolset.external_tool", tool="External")
             logger.exception("External tool call failed: {tool_name}:", tool_name=self.name)
             return ToolError(
                 message=f"External tool call failed: {e}",
