@@ -88,9 +88,33 @@ jobs:
       - name: Prepare building environment
         run: make prepare-build
 
+      # macOS: Determine whether Developer ID signing + Apple notarization
+      # secrets are configured. When they aren't, downstream codesign/notarize
+      # steps are skipped and the binary ships ad-hoc-signed by PyInstaller.
+      - name: Detect macOS signing secrets
+        id: macos_signing
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_NOTARIZATION_KEY_P8: ${{ secrets.APPLE_NOTARIZATION_KEY_P8 }}
+        run: |
+          if [[ -n "$APPLE_CERTIFICATE_P12" ]]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "Developer ID signing secrets present"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "APPLE_CERTIFICATE_P12 not set - building ad-hoc-signed macOS binary"
+          fi
+          if [[ -n "$APPLE_NOTARIZATION_KEY_P8" ]]; then
+            echo "notarize=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "notarize=false" >> "$GITHUB_OUTPUT"
+            echo "APPLE_NOTARIZATION_KEY_P8 not set - skipping notarization"
+          fi
+
       # macOS: Setup signing certificate before build
       - name: Setup macOS signing certificate
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.sign == 'true'
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -142,7 +166,7 @@ jobs:
 
       # macOS: Sign onefile binary
       - name: Sign macOS onefile binary
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.sign == 'true'
         run: |
           set -euo pipefail
           echo "Signing onefile binary..."
@@ -155,7 +179,7 @@ jobs:
 
       # macOS: Sign onedir binaries (all dylibs and executables)
       - name: Sign macOS onedir binaries
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.sign == 'true'
         run: |
           set -euo pipefail
           echo "Signing onedir binaries..."
@@ -191,7 +215,7 @@ jobs:
 
       # macOS: Notarize onefile binary
       - name: Notarize macOS onefile binary
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.sign == 'true' && steps.macos_signing.outputs.notarize == 'true'
         env:
           APPLE_NOTARIZATION_KEY_P8: ${{ secrets.APPLE_NOTARIZATION_KEY_P8 }}
           APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
@@ -249,7 +273,7 @@ jobs:
 
       # macOS: Notarize onedir binaries
       - name: Notarize macOS onedir binaries
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.sign == 'true' && steps.macos_signing.outputs.notarize == 'true'
         env:
           APPLE_NOTARIZATION_KEY_P8: ${{ secrets.APPLE_NOTARIZATION_KEY_P8 }}
           APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
@@ -504,3 +528,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
+          # Idempotent on re-runs: skip files already published (e.g. when the
+          # tag was rerun to fix a macOS binary build that didn't affect the
+          # already-uploaded wheel/sdist).
+          skip-existing: true
