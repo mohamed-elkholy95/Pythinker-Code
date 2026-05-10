@@ -124,6 +124,9 @@ async def run_soul_checked(
             brief="LLM provider error",
         )
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="subagents.run.soul")
         logger.exception("Subagent soul run failed when {phase}", phase=phase)
         return SoulRunFailure(
             message=f"Unexpected error when {phase}: {exc}",
@@ -316,7 +319,10 @@ class ForegroundSubagentRunner:
             self._store.update_instance(agent_id, status="killed")
             output_writer.stage("cancelled")
             raise RunCancelled("Subagent run was cancelled.") from exc
-        except Exception:
+        except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="subagents.run.background")
             self._store.update_instance(agent_id, status="failed")
             output_writer.stage("failed_exception")
             raise

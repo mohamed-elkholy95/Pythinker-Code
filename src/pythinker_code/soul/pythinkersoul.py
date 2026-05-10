@@ -286,7 +286,14 @@ class PythinkerSoul:
             try:
                 result = await provider.get_injections(self._context.history, self)
                 injections.extend(result)
-            except Exception:
+            except Exception as exc:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(
+                    exc,
+                    site="soul.injection.get",
+                    provider=type(provider).__name__,
+                )
                 logger.warning(
                     "injection provider %s failed",
                     type(provider).__name__,
@@ -304,7 +311,14 @@ class PythinkerSoul:
         for provider in self._injection_providers:
             try:
                 await provider.on_context_compacted()
-            except Exception:
+            except Exception as exc:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(
+                    exc,
+                    site="soul.injection.on_context_compacted",
+                    provider=type(provider).__name__,
+                )
                 logger.warning(
                     "injection provider %s on_context_compacted failed",
                     type(provider).__name__,
@@ -316,7 +330,14 @@ class PythinkerSoul:
         for provider in self._injection_providers:
             try:
                 await provider.on_auto_changed(enabled)
-            except Exception:
+            except Exception as exc:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(
+                    exc,
+                    site="soul.injection.on_auto_changed",
+                    provider=type(provider).__name__,
+                )
                 logger.warning(
                     "injection provider %s on_auto_changed failed",
                     type(provider).__name__,
@@ -937,6 +958,9 @@ class PythinkerSoul:
                     try:
                         await self.compact_context()
                     except Exception as compact_err:
+                        from pythinker_code.telemetry.errors import report_handled_error
+
+                        report_handled_error(compact_err, site="soul.context.compact")
                         logger.error(
                             "Context compaction failed at step {step_no}: {error_type}: {error}",
                             step_no=step_no,
@@ -952,6 +976,9 @@ class PythinkerSoul:
             except BackToTheFuture as e:
                 back_to_the_future = e
             except Exception as e:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(e, site="soul.step.error")
                 # any other exception should interrupt the step
                 req_id = getattr(e, "request_id", None)
                 logger.error(
@@ -1453,7 +1480,10 @@ class PythinkerSoul:
                 raise
             try:
                 recovered = chat_provider.on_retryable_error(error)
-            except Exception:
+            except Exception as recover_exc:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(recover_exc, site="soul.chat.recover")
                 logger.exception(
                     "Failed to recover chat provider during {name} after {error_type}.",
                     name=name,

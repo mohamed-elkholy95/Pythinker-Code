@@ -248,6 +248,9 @@ async def refresh_managed_models(config: Config) -> bool:
             try:
                 await oauth_manager.ensure_fresh()
             except Exception as exc:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(exc, site="auth.platforms.refresh.pre_sync")
                 logger.warning(
                     "Failed to refresh OAuth token before model sync for {platform}: {error}",
                     platform=platform_id,
@@ -281,6 +284,9 @@ async def refresh_managed_models(config: Config) -> bool:
             try:
                 await oauth_manager.ensure_fresh(force=True)
             except Exception as exc2:
+                from pythinker_code.telemetry.errors import report_handled_error
+
+                report_handled_error(exc2, site="auth.platforms.refresh.after_401")
                 refresh_exc = exc2
                 logger.warning(
                     "Failed to refresh OAuth token after 401 for {platform}: {error}",
@@ -323,6 +329,9 @@ async def refresh_managed_models(config: Config) -> bool:
                         changed = True
                 continue
         except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="auth.platforms.sync")
             fallback_models = _fallback_or_log(platform_id=platform_id, error=exc)
             if fallback_models is None:
                 continue

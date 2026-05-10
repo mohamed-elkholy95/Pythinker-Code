@@ -148,6 +148,9 @@ class ACPProcess:
             )
             self._feed_output(final_output)
         except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="acp.host.terminal")
             error_note = f"[acp terminal error] {exc}\n"
             self._stdout.feed_data(error_note.encode("utf-8", "replace"))
             if exit_code is None:

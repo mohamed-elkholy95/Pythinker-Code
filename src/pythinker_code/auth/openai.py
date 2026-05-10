@@ -612,6 +612,9 @@ async def _finish_chatgpt_login(
         models = await _discover_chatgpt_models(token.access_token)
         selected_model, thinking = _select_default_openai_model(models)
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="auth.openai.discover_chatgpt_models")
         yield OAuthEvent("error", f"Failed to discover OpenAI ChatGPT models: {exc}")
         return
 
@@ -649,6 +652,9 @@ async def login_openai_browser(
         code, verifier, redirect_uri = await _wait_for_browser_code(open_browser=open_browser)
         token_payload = await _exchange_code_for_tokens(code, verifier, redirect_uri)
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="auth.openai.browser_login")
         yield OAuthEvent("error", f"OpenAI browser login failed: {exc}")
         return
 
@@ -667,6 +673,9 @@ async def login_openai_headless(config: Config) -> AsyncIterator[OAuthEvent]:
     try:
         device_code = await _request_device_code()
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="auth.openai.device_start")
         yield OAuthEvent("error", f"Failed to start OpenAI device login: {exc}")
         return
 
@@ -688,6 +697,9 @@ async def login_openai_headless(config: Config) -> AsyncIterator[OAuthEvent]:
             OPENAI_DEVICE_REDIRECT_URI,
         )
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="auth.openai.device_poll")
         yield OAuthEvent("error", f"OpenAI device login failed: {exc}")
         return
 

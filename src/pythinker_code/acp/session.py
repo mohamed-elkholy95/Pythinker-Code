@@ -233,6 +233,9 @@ class ACPSession:
             logger.info("Prompt cancelled by user")
             return acp.PromptResponse(stop_reason="cancelled")
         except Exception as e:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(e, site="acp.session.prompt")
             logger.exception("Unexpected error during prompt:")
             raise acp.RequestError.internal_error({"error": str(e)}) from e
         finally:
@@ -461,7 +464,10 @@ class ACPSession:
                 # cancelled
                 logger.debug("Permission request cancelled for: {action}", action=request.action)
                 request.resolve("reject")
-        except Exception:
+        except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="acp.session.approval")
             logger.exception("Error handling approval request:")
             # On error, reject the request
             request.resolve("reject")

@@ -51,6 +51,9 @@ async def run_hook(
             await proc.wait()
             raise
     except Exception as e:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(e, site="hooks.runner")
         logger.warning("Hook failed: {}: {}", command, e)
         return HookResult(action="allow", stderr=str(e))
 

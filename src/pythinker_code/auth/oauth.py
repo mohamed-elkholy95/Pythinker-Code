@@ -358,6 +358,9 @@ def _load_from_keyring(key: str) -> OAuthToken | None:
     try:
         raw = keyring.get_password(KEYRING_SERVICE, key)
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="auth.keyring.read")
         logger.warning("Failed to read token from keyring: {error}", error=exc)
         return None
     if not raw:
@@ -632,6 +635,9 @@ async def login_pythinker_code(
         try:
             auth = await request_device_authorization()
         except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="auth.oauth.device_authorize")
             yield OAuthEvent("error", f"Login failed: {exc}")
             return
 
@@ -680,6 +686,9 @@ async def login_pythinker_code(
             yield OAuthEvent("info", "Device code expired, restarting login...")
             continue
         except Exception as exc:
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="auth.oauth.device_poll")
             yield OAuthEvent("error", f"Login failed: {exc}")
             return
         break
@@ -692,6 +701,9 @@ async def login_pythinker_code(
     try:
         models = await list_models(platform, token.access_token)
     except Exception as exc:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(exc, site="auth.models.fetch")
         logger.error("Failed to get models: {error}", error=exc)
         yield OAuthEvent("error", f"Failed to get models: {exc}")
         return
@@ -947,6 +959,9 @@ class OAuthManager:
                     try:
                         await self.ensure_fresh(runtime, force=force)
                     except Exception as exc:
+                        from pythinker_code.telemetry.errors import report_handled_error
+
+                        report_handled_error(exc, site="auth.oauth.refresh.background")
                         logger.warning(
                             "Failed to refresh OAuth token in background: {error}",
                             error=exc,
@@ -1071,6 +1086,9 @@ class OAuthManager:
                 except Exception as exc:
                     if force:
                         raise
+                    from pythinker_code.telemetry.errors import report_handled_error
+
+                    report_handled_error(exc, site="auth.oauth.refresh")
                     logger.warning("Failed to refresh OAuth token: {error}", error=exc)
                     from pythinker_code.telemetry import track
 

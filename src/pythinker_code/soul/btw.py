@@ -176,6 +176,9 @@ async def execute_side_question(
 
         return None, "No response received."
     except Exception as e:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(e, site="soul.btw.execute")
         logger.warning("Side question failed: {error}", error=e)
         return None, str(e)
 
@@ -210,5 +213,8 @@ async def run_side_question(soul: PythinkerSoul, question: str) -> None:
         else:
             wire_send(BtwEnd(id=btw_id, error=error or "No response received."))
     except Exception as e:
+        from pythinker_code.telemetry.errors import report_handled_error
+
+        report_handled_error(e, site="soul.btw.run_wire")
         logger.warning("Side question failed: {error}", error=e)
         wire_send(BtwEnd(id=btw_id, error=str(e)))
