@@ -1,0 +1,47 @@
+name: dependabot-review-required
+
+# Hard guardrail against bot-bumps merging without a human review.
+#
+# Required status check on `main`: dependabot PRs only pass when the
+# `dependabot-approved` label is present (manually applied by a human
+# reviewer after they've actually inspected the diff).
+#
+# Non-dependabot PRs always pass — the check is permissive for normal work.
+#
+# This survives the drop-`required_approving_review_count`-to-0 pattern
+# because required *status checks* are enforced independently of review
+# counts, and `enforce_admins: true` makes them apply to admins too.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide
+        env:
+          # GitHub-validated string; used in shell only as a quoted variable.
+          ACTOR: ${{ github.event.pull_request.user.login }}
+          # JSON array of label names; jq parses it; never interpolated into shell.
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if [[ "$ACTOR" != "dependabot[bot]" ]]; then
+            echo "PR author is $ACTOR (not dependabot) - pass"
+            exit 0
+          fi
+          if jq -e 'index("dependabot-approved")' <<< "$LABELS" > /dev/null; then
+            echo "dependabot PR has 'dependabot-approved' label - pass"
+            exit 0
+          fi
+          echo "::error::Dependabot PR is missing the 'dependabot-approved' label."
+          echo "::error::A human reviewer must inspect the bump (especially lockfile diffs"
+          echo "::error::and breaking-change notes) and apply the label before this can merge."
+          exit 1
