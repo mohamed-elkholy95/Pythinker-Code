@@ -48,7 +48,16 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
-## 🆕 What's New in 2.2.0
+## 🆕 What's New in 2.2.1
+
+CI hardening on top of 2.2.0.
+
+- **macOS binary build is now optional-codesign** — the release workflow detects whether `APPLE_CERTIFICATE_P12` / `APPLE_NOTARIZATION_KEY_P8` repo secrets are set. When they aren't (the v2.2.0 case), it ships an ad-hoc-signed PyInstaller binary instead of failing the whole release. PyPI install (`pip install pythinker-code`) is unaffected.
+- **PyPI publish is idempotent** — `pypa/gh-action-pypi-publish` now runs with `skip-existing: true`, so re-running the release workflow against an already-published version is a no-op.
+
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.2.1`.
+
+### What was new in 2.2.0
 
 Animated installer + Windows PATH automation, on top of 2.1.2.
 
@@ -86,7 +95,6 @@ A focused refresh of the TUI and slash-command UX.
 - **Prompt templates** — discovery is now `~/.pythinker/prompts` and `<project>/.pythinker/prompts`. The legacy directory lookup has been retired.
 - **TUI style flag** — only `card` (default) and `pythinker` are accepted; the legacy alias has been dropped.
 
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.2.0`.
 
 ---
 

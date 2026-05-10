@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.2.1 (2026-05-09)
+
+CI hardening: macOS binary build is now optional-codesign.
+
+- `.github/workflows/release-pythinker-cli.yml`: detect whether `APPLE_CERTIFICATE_P12` and `APPLE_NOTARIZATION_KEY_P8` repo secrets are configured. When they aren't, skip the keychain setup, codesign, and notarization steps and ship an ad-hoc-signed PyInstaller binary instead of failing the whole release. The 2.2.0 release run failed because those secrets were empty in CI; this makes the release matrix all-green even without an Apple Developer cert.
+- `.github/workflows/release-pythinker-cli.yml`: add `skip-existing: true` to `pypa/gh-action-pypi-publish` so re-runs of the release workflow against an already-published version are no-ops instead of HTTP 400 errors.
+- macOS-arm64 binary downloads from the GitHub Release page will now show a Gatekeeper warning on first launch when the secrets aren't configured. Users can clear it with `xattr -d com.apple.quarantine ./pythinker`. PyPI install (`pip install pythinker-code`) is unaffected.
+
 ## 2.2.0 (2026-05-09)
 
 Installer UX: animated logo + Windows PATH automation.
