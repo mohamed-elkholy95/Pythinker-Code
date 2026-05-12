@@ -251,6 +251,44 @@ jobs:
             --pyproject pyproject.toml \
             --expected-version "$EXPECTED_VERSION"
 
+      # Hard constraint: every pyproject version bump must be accompanied
+      # by a README "What's New" section + pinned upgrade snippet and a
+      # CHANGELOG entry. This is the same gate the release workflow
+      # enforces at tag time, run here on the PR so we never tag a
+      # version whose README/CHANGELOG drifted.
+      - name: Verify README references the new version
+        if: steps.version.outputs.bump == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.head_version }}
+        run: |
+          set -euo pipefail
+          missing=()
+          if ! grep -qF "What's New in ${RELEASE_VERSION}" README.md; then
+            missing+=("a '## What\'s New in ${RELEASE_VERSION}' section")
+          fi
+          if ! grep -qF "pythinker-code==${RELEASE_VERSION}" README.md; then
+            missing+=("a 'pip install --upgrade pythinker-code==${RELEASE_VERSION}' upgrade snippet")
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '::error title=README out of sync with version bump %s::Update README.md in the same PR as the version bump. Missing: %s\n' \
+              "${RELEASE_VERSION}" "${missing[*]}"
+            exit 1
+          fi
+          echo "README.md references release ${RELEASE_VERSION}"
+
+      - name: Verify CHANGELOG references the new version
+        if: steps.version.outputs.bump == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.head_version }}
+        run: |
+          set -euo pipefail
+          if ! grep -qE "^## ${RELEASE_VERSION} \\(" CHANGELOG.md; then
+            printf '::error title=CHANGELOG out of sync with version bump %s::Add a "## %s (YYYY-MM-DD)" entry to CHANGELOG.md in the same PR as the version bump.\n' \
+              "${RELEASE_VERSION}" "${RELEASE_VERSION}"
+            exit 1
+          fi
+          echo "CHANGELOG.md has an entry for ${RELEASE_VERSION}"
+
   nix-test:
     strategy:
       fail-fast: true
