@@ -229,19 +229,26 @@ class ForegroundSubagentRunner:
             prompt=req.prompt,
             resumed=resumed,
         )
-        soul, prompt = await prepare_soul(
-            spec,
-            self._runtime,
-            self._builder,
-            self._store,
-            on_stage=output_writer.stage,
-        )
-
         self._store.update_instance(
             agent_id,
             status="running_foreground",
             description=req.description.strip(),
         )
+        try:
+            soul, prompt = await prepare_soul(
+                spec,
+                self._runtime,
+                self._builder,
+                self._store,
+                on_stage=output_writer.stage,
+            )
+        except asyncio.CancelledError:
+            self._store.update_instance(agent_id, status="killed")
+            raise
+        except Exception:
+            self._store.update_instance(agent_id, status="failed")
+            raise
+
         approval_source: ApprovalSource | None = None
         approval_source_token = None
         try:
