@@ -189,7 +189,11 @@ jobs:
           BINARY_PATH: ${{ matrix.binary_path }}
 
       - name: Upload binary artifact
-        if: success()
+        # The experimental windows-2025-vs2026 probe shares its target string
+        # with the release-blocking windows-2022 entry, so uploading would
+        # collide on the artifact name. The probe only needs the build to
+        # succeed; we do not consume its binary.
+        if: success() && !matrix.experimental
         uses: actions/upload-artifact@v4
         with:
           name: pythinker-${{ matrix.target }}

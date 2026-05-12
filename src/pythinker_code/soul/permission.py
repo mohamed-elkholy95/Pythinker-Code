@@ -262,7 +262,7 @@ def shell_mutation_reason(command: str) -> str | None:
     try:
         tokens = shlex.split(command, posix=True)
     except ValueError:
-        return "unparseable shell command"
+        return "unparsable shell command"
 
     segment: list[str] = []
     for token in [*tokens, ";"]:
