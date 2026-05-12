@@ -176,6 +176,18 @@ class AgentTool(CallableTool2[Params]):
             # Internal timeout (e.g. aiohttp request) — treat as generic failure
             logger.exception("Foreground agent run failed")
             return ToolError(message=f"Failed to run agent: {exc}", brief="Agent failed")
+        except FileNotFoundError as exc:
+            logger.warning("Foreground agent resume target was not found: {err}", err=exc)
+            return ToolError(message=str(exc), brief="Agent not found")
+        except RuntimeError as exc:
+            if "cannot be resumed concurrently" in str(exc):
+                logger.warning("Foreground agent resume rejected: {err}", err=exc)
+                return ToolError(message=str(exc), brief="Agent already running")
+            from pythinker_code.telemetry.errors import report_handled_error
+
+            report_handled_error(exc, site="tool.agent.foreground", tool="Agent")
+            logger.exception("Foreground agent run failed")
+            return ToolError(message=f"Failed to run agent: {exc}", brief="Agent failed")
         except Exception as exc:
             from pythinker_code.telemetry.errors import report_handled_error
 
@@ -286,7 +298,7 @@ class AgentTool(CallableTool2[Params]):
                 f"dependencies: {dependency_text}",
                 f"budget_seconds: {budget_text}",
                 f"isolation: {params.isolation}",
-                f"synthesis_state: {view.spec.synthesis_state or 'pending'}",
+                f"synthesis_state: {getattr(view.spec, 'synthesis_state', None) or 'pending'}",
                 "automatic_notification: true",
                 "next_step: You will be automatically notified when it completes.",
                 (
