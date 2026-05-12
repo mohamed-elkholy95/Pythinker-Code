@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 import shlex
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pythinker_core.tooling import ToolError
 
@@ -71,6 +72,10 @@ _SUBAGENT_PROFILES: dict[str, PermissionProfileName] = {
     "coder": "implement",
     "implementer": "implement",
 }
+
+_STEP_PERMISSION_PROFILE: ContextVar[PermissionProfile | None] = ContextVar(
+    "pythinker_step_permission_profile", default=None
+)
 
 _SHELL_SEGMENT_SEPARATORS = {";", "&&", "||", "|"}
 _WRITING_REDIRECTION_RE = re.compile(r"(?:^|\s)(?:[0-9]*>>?|&>)\s*(\S+)")
@@ -157,10 +162,29 @@ def permission_profile_for_runtime(runtime: Runtime) -> PermissionProfile:
     return _PERMISSION_PROFILES[profile_name]
 
 
+def active_permission_profile(runtime: Runtime) -> PermissionProfile:
+    """Return the effective profile for this task.
+
+    A single LLM step snapshots the profile before tool calls start. Tool tasks inherit that
+    ContextVar value, so plan/read-only checks cannot race with an ExitPlanMode tool call from the
+    same assistant response.
+    """
+    return _STEP_PERMISSION_PROFILE.get() or permission_profile_for_runtime(runtime)
+
+
+def set_step_permission_profile(profile: PermissionProfile) -> Token[PermissionProfile | None]:
+    """Freeze permission checks for all tool tasks spawned in the current context."""
+    return _STEP_PERMISSION_PROFILE.set(profile)
+
+
+def reset_step_permission_profile(token: Token[PermissionProfile | None]) -> None:
+    _STEP_PERMISSION_PROFILE.reset(token)
+
+
 def check_file_mutation_allowed(
     runtime: Runtime, *, is_plan_artifact: bool = False
 ) -> ToolError | None:
-    profile = permission_profile_for_runtime(runtime)
+    profile = active_permission_profile(runtime)
     if profile.allow_file_mutation:
         return None
     if is_plan_artifact and profile.allow_plan_file_mutation:
@@ -175,7 +199,7 @@ def check_file_mutation_allowed(
 
 
 def check_shell_command_allowed(runtime: Runtime, command: str) -> ToolError | None:
-    profile = permission_profile_for_runtime(runtime)
+    profile = active_permission_profile(runtime)
     if profile.allow_shell_mutation:
         return None
     reason = shell_mutation_reason(command)
@@ -189,6 +213,38 @@ def check_shell_command_allowed(runtime: Runtime, command: str) -> ToolError | N
         ),
         brief="Permission profile restriction",
     )
+
+
+def check_external_tool_allowed(runtime: Runtime, tool_name: str) -> ToolError | None:
+    """Fail closed for tools whose side effects are not classified by built-in guards."""
+    profile = active_permission_profile(runtime)
+    if profile.allow_file_mutation and profile.allow_shell_mutation:
+        return None
+    return ToolError(
+        message=(
+            f"The active {profile.description} permission profile blocks external tool "
+            f"`{tool_name}` because its side effects are not known to be read-only. "
+            "Switch to an implementation/coder profile before using external tools."
+        ),
+        brief="Permission profile restriction",
+    )
+
+
+def check_tool_call_allowed(
+    runtime: Runtime, tool_name: str, arguments: dict[str, Any], *, tool: object | None = None
+) -> ToolError | None:
+    """Central permission guard for tool adapters that can bypass per-tool checks."""
+    if tool_name == "Shell" and isinstance(arguments.get("command"), str):
+        return check_shell_command_allowed(runtime, arguments["command"])
+
+    tool_type = type(tool)
+    module = getattr(tool_type, "__module__", "")
+    qualname = getattr(tool_type, "__qualname__", "")
+    if module == "pythinker_code.plugin.tool" and qualname.endswith("PluginTool"):
+        return check_external_tool_allowed(runtime, tool_name)
+    if module == "pythinker_code.soul.toolset" and qualname in {"MCPTool", "WireExternalTool"}:
+        return check_external_tool_allowed(runtime, tool_name)
+    return None
 
 
 def shell_mutation_reason(command: str) -> str | None:

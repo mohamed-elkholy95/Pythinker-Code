@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import platform
+import sys
 
 import pytest
 from pythinker_host.path import HostPath
@@ -93,4 +95,70 @@ async def test_read_only_profile_denies_write_file_even_if_tool_is_present(
 
     assert result.is_error
     assert "permission profile blocks file mutations" in result.message
+    assert not await target.exists()
+
+
+async def test_toolset_denies_plugin_tool_in_read_only_profile(
+    runtime: Runtime,
+    tmp_path,
+) -> None:
+    from pythinker_code.plugin import PluginToolSpec
+    from pythinker_code.plugin.tool import PluginTool
+    from pythinker_code.soul.toolset import PythinkerToolset
+    from pythinker_code.wire.types import ToolCall, ToolResult
+
+    runtime.role = "subagent"
+    runtime.subagent_type = "explore"
+    plugin_dir = tmp_path / "plugin"
+    plugin_dir.mkdir()
+    toolset = PythinkerToolset(runtime)
+    toolset.add(
+        PluginTool(
+            PluginToolSpec(
+                name="plugin_tool",
+                description="test",
+                command=[sys.executable, "-c", "print('should not run')"],
+            ),
+            plugin_dir=plugin_dir,
+            inject={},
+            config=runtime.config,
+        )
+    )
+
+    handle_result = toolset.handle(
+        ToolCall(
+            id="plugin-call",
+            function=ToolCall.FunctionBody(name="plugin_tool", arguments=json.dumps({})),
+        )
+    )
+    result = handle_result if isinstance(handle_result, ToolResult) else await handle_result
+
+    assert result.return_value.is_error
+    assert "permission profile blocks external tool" in result.return_value.message
+
+
+async def test_step_permission_profile_snapshot_blocks_same_step_plan_exit_race(
+    runtime: Runtime,
+    environment: Environment,
+    temp_work_dir: HostPath,
+) -> None:
+    from pythinker_code.soul.permission import (
+        permission_profile_for_runtime,
+        reset_step_permission_profile,
+        set_step_permission_profile,
+    )
+
+    runtime.session.state.plan_mode = True
+    token = set_step_permission_profile(permission_profile_for_runtime(runtime))
+    try:
+        runtime.session.state.plan_mode = False
+        target = temp_work_dir / "same-step-race.txt"
+        with tool_call_context("Shell"):
+            shell = Shell(Approval(yolo=True), environment, runtime)
+            result = await shell(ShellParams(command=f"touch {target}"))
+    finally:
+        reset_step_permission_profile(token)
+
+    assert result.is_error
+    assert "permission profile blocks" in result.message
     assert not await target.exists()

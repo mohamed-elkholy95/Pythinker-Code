@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from fastmcp.mcp_config import MCPConfig
 
 
+_CWD_LOCK = asyncio.Lock()
+
+
 def _patch_session_id(record: dict[str, Any]) -> None:
     """Inject the current session ID (from ContextVar) into log records."""
     try:
@@ -522,15 +525,16 @@ class PythinkerCLI:
 
     @contextlib.asynccontextmanager
     async def _env(self) -> AsyncGenerator[None]:
-        original_cwd = HostPath.cwd()
-        await pythinker_host.chdir(self._runtime.session.work_dir)
-        try:
-            # to ignore possible warnings from dateparser
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            async with self._runtime.oauth.refreshing(self._runtime):
-                yield
-        finally:
-            await pythinker_host.chdir(original_cwd)
+        async with _CWD_LOCK:
+            original_cwd = HostPath.cwd()
+            await pythinker_host.chdir(self._runtime.session.work_dir)
+            try:
+                # to ignore possible warnings from dateparser
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                async with self._runtime.oauth.refreshing(self._runtime):
+                    yield
+            finally:
+                await pythinker_host.chdir(original_cwd)
 
     async def run(
         self,

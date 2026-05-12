@@ -69,6 +69,11 @@ from pythinker_code.soul.message import (
     system_reminder,
     tool_result_to_message,
 )
+from pythinker_code.soul.permission import (
+    permission_profile_for_runtime,
+    reset_step_permission_profile,
+    set_step_permission_profile,
+)
 from pythinker_code.soul.slash import registry as soul_slash_registry
 from pythinker_code.soul.toolset import PythinkerToolset
 from pythinker_code.tools.dmail import NAME as SendDMail_NAME
@@ -1024,19 +1029,16 @@ class PythinkerSoul:
                 # --- StopFailure hook ---
                 from pythinker_code.hooks import events as _hook_events
 
-                _hook_task = asyncio.create_task(
-                    self._hook_engine.trigger(
-                        "StopFailure",
-                        matcher_value=type(e).__name__,
-                        input_data=_hook_events.stop_failure(
-                            session_id=self._runtime.session.id,
-                            cwd=str(Path.cwd()),
-                            error_type=type(e).__name__,
-                            error_message=str(e),
-                        ),
-                    )
+                self._hook_engine.fire_and_forget_trigger(
+                    "StopFailure",
+                    matcher_value=type(e).__name__,
+                    input_data=_hook_events.stop_failure(
+                        session_id=self._runtime.session.id,
+                        cwd=str(Path.cwd()),
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                    ),
                 )
-                _hook_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
                 # break the agent loop
                 raise
 
@@ -1077,22 +1079,19 @@ class PythinkerSoul:
                 # --- Notification hook ---
                 from pythinker_code.hooks import events
 
-                _hook_task = asyncio.create_task(
-                    self._hook_engine.trigger(
-                        "Notification",
-                        matcher_value=view.event.type,
-                        input_data=events.notification(
-                            session_id=self._runtime.session.id,
-                            cwd=str(Path.cwd()),
-                            sink="llm",
-                            notification_type=view.event.type,
-                            title=view.event.title,
-                            body=view.event.body,
-                            severity=view.event.severity,
-                        ),
-                    )
+                self._hook_engine.fire_and_forget_trigger(
+                    "Notification",
+                    matcher_value=view.event.type,
+                    input_data=events.notification(
+                        session_id=self._runtime.session.id,
+                        cwd=str(Path.cwd()),
+                        sink="llm",
+                        notification_type=view.event.type,
+                        title=view.event.title,
+                        body=view.event.body,
+                        severity=view.event.severity,
+                    ),
                 )
-                _hook_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
             await self._runtime.notifications.deliver_pending(
                 "llm",
@@ -1133,14 +1132,20 @@ class PythinkerSoul:
             ) as span:
                 llm_t0 = time.monotonic()
                 try:
-                    step_result = await pythinker_core.step(
-                        chat_provider,
-                        self._agent.system_prompt,
-                        self._agent.toolset,
-                        effective_history,
-                        on_message_part=wire_send,
-                        on_tool_result=wire_send,
+                    profile_token = set_step_permission_profile(
+                        permission_profile_for_runtime(self._runtime)
                     )
+                    try:
+                        step_result = await pythinker_core.step(
+                            chat_provider,
+                            self._agent.system_prompt,
+                            self._agent.toolset,
+                            effective_history,
+                            on_message_part=wire_send,
+                            on_tool_result=wire_send,
+                        )
+                    finally:
+                        reset_step_permission_profile(profile_token)
                 except Exception as exc:
                     llm_elapsed = time.monotonic() - llm_t0
                     error_type, status_code = classify_api_error(exc)
@@ -1230,8 +1235,13 @@ class PythinkerSoul:
         if self._plan_mode != plan_mode_before_tools:
             wire_send(StatusUpdate(plan_mode=self._plan_mode))
 
-        # shield the context manipulation from interruption
-        await asyncio.shield(self._grow_context(result, results))
+        # Shield context manipulation from cancellation, but do not orphan the write task.
+        grow_context_task = asyncio.create_task(self._grow_context(result, results))
+        try:
+            await asyncio.shield(grow_context_task)
+        except asyncio.CancelledError:
+            await asyncio.shield(grow_context_task)
+            raise
 
         rejected_errors = [
             result.return_value
@@ -1428,19 +1438,16 @@ class PythinkerSoul:
             success=True,
         )
 
-        _hook_task = asyncio.create_task(
-            self._hook_engine.trigger(
-                "PostCompact",
-                matcher_value=trigger_reason,
-                input_data=events.post_compact(
-                    session_id=self._runtime.session.id,
-                    cwd=str(Path.cwd()),
-                    trigger=trigger_reason,
-                    estimated_token_count=estimated_token_count,
-                ),
-            )
+        self._hook_engine.fire_and_forget_trigger(
+            "PostCompact",
+            matcher_value=trigger_reason,
+            input_data=events.post_compact(
+                session_id=self._runtime.session.id,
+                cwd=str(Path.cwd()),
+                trigger=trigger_reason,
+                estimated_token_count=estimated_token_count,
+            ),
         )
-        _hook_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
     @staticmethod
     def _is_retryable_error(exception: BaseException) -> bool:
