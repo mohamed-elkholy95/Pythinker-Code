@@ -98,6 +98,9 @@ jobs:
 
   build:
     strategy:
+      # The release-blocking entries stay fail-fast. The experimental VS 2026
+      # probe below is opted out via continue-on-error so its failures do not
+      # cancel sibling jobs.
       fail-fast: true
       matrix:
         include:
@@ -113,7 +116,17 @@ jobs:
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
             binary_path: dist/onefile/pythinker.exe
+          # Forward-compat probe for windows-latest -> VS 2026 migration
+          # (rolling out 2026-06-08 to 2026-06-15). Same Rust target as the
+          # release-blocking windows-2022 entry but built against VS 2026 /
+          # MSVC v144 to surface toolchain regressions before windows-2022
+          # is deprecated.
+          - runner: windows-2025-vs2026
+            target: x86_64-pc-windows-msvc
+            binary_path: dist/onefile/pythinker.exe
+            experimental: true
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental == true }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
