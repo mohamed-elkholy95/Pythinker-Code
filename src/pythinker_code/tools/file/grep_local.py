@@ -4,6 +4,7 @@ Be cautious that `HostPath` is not used in this implementation.
 """
 
 import asyncio
+import fnmatch
 import os
 import platform
 import re
@@ -138,10 +139,30 @@ class Params(BaseModel):
 
 RG_VERSION = "15.0.0"
 RG_BASE_URL = "http://cdn.pythinker.com/binaries/pythinker-code/rg"
+RG_GITHUB_BASE_URL = "https://github.com/BurntSushi/ripgrep/releases/download"
 RG_TIMEOUT = 20  # seconds
 RG_MAX_BUFFER = 20_000_000  # 20MB stdout/stderr buffer limit
 RG_KILL_GRACE = 5  # seconds: SIGTERM → SIGKILL
 _RG_DOWNLOAD_LOCK = asyncio.Lock()
+_PYTHON_FALLBACK_TYPE_GLOBS = {
+    "bash": ("*.bash", "*.sh"),
+    "c": ("*.c", "*.h"),
+    "cpp": ("*.cc", "*.cpp", "*.cxx", "*.hpp", "*.hxx"),
+    "go": ("*.go",),
+    "java": ("*.java",),
+    "js": ("*.cjs", "*.js", "*.jsx", "*.mjs"),
+    "json": ("*.json",),
+    "markdown": ("*.markdown", "*.md"),
+    "md": ("*.markdown", "*.md"),
+    "py": ("*.py", "*.pyw"),
+    "rust": ("*.rs",),
+    "sh": ("*.bash", "*.sh"),
+    "toml": ("*.toml",),
+    "ts": ("*.ts", "*.tsx"),
+    "txt": ("*.txt",),
+    "yaml": ("*.yaml", "*.yml"),
+    "zsh": ("*.zsh",),
+}
 
 
 def _rg_binary_name() -> str:
@@ -149,6 +170,11 @@ def _rg_binary_name() -> str:
 
 
 def _find_existing_rg(bin_name: str) -> Path | None:
+    if env_path := os.getenv("PYTHINKER_RG_PATH"):
+        configured = Path(env_path).expanduser()
+        if configured.is_file():
+            return configured
+
     share_bin = get_share_dir() / "bin" / bin_name
     if share_bin.is_file():
         return share_bin
@@ -161,6 +187,16 @@ def _find_existing_rg(bin_name: str) -> Path | None:
     system_rg = shutil.which("rg")
     if system_rg:
         return Path(system_rg)
+
+    for candidate in (
+        Path("/usr/bin") / bin_name,
+        Path("/usr/local/bin") / bin_name,
+        Path.home() / ".cargo" / "bin" / bin_name,
+        Path.home() / ".local" / "bin" / bin_name,
+        Path.home() / ".pi" / "agent" / "bin" / bin_name,
+    ):
+        if candidate.is_file():
+            return candidate
 
     return None
 
@@ -198,8 +234,10 @@ async def _download_and_install_rg(bin_name: str) -> Path:
     is_windows = "windows" in target
     archive_ext = "zip" if is_windows else "tar.gz"
     filename = f"ripgrep-{RG_VERSION}-{target}.{archive_ext}"
-    url = f"{RG_BASE_URL}/{filename}"
-    logger.info("Downloading ripgrep from {url}", url=url)
+    urls = [
+        f"{RG_BASE_URL}/{filename}",
+        f"{RG_GITHUB_BASE_URL}/{RG_VERSION}/{filename}",
+    ]
 
     share_bin_dir = get_share_dir() / "bin"
     share_bin_dir.mkdir(parents=True, exist_ok=True)
@@ -211,15 +249,24 @@ async def _download_and_install_rg(bin_name: str) -> Path:
         with tempfile.TemporaryDirectory(prefix="pythinker-rg-") as tmpdir:
             tar_path = Path(tmpdir) / filename
 
-            try:
-                async with session.get(url) as resp:
-                    resp.raise_for_status()
-                    with open(tar_path, "wb") as fh:
-                        async for chunk in resp.content.iter_chunked(1024 * 64):
-                            if chunk:
-                                fh.write(chunk)
-            except (aiohttp.ClientError, TimeoutError) as exc:
-                raise RuntimeError("Failed to download ripgrep binary") from exc
+            download_errors: list[str] = []
+            for url in urls:
+                logger.info("Downloading ripgrep from {url}", url=url)
+                try:
+                    async with session.get(url) as resp:
+                        resp.raise_for_status()
+                        with open(tar_path, "wb") as fh:
+                            async for chunk in resp.content.iter_chunked(1024 * 64):
+                                if chunk:
+                                    fh.write(chunk)
+                    break
+                except (aiohttp.ClientError, TimeoutError) as exc:
+                    download_errors.append(f"{url}: {exc}")
+            else:
+                raise RuntimeError(
+                    "Failed to download ripgrep binary from configured mirrors: "
+                    + "; ".join(download_errors)
+                )
 
             try:
                 if is_windows:
@@ -381,6 +428,165 @@ def _strip_path_prefix(output: str, search_base: str) -> str:
     )
 
 
+def _relative_output_path(path: Path, search_base: Path) -> str:
+    try:
+        return str(path.relative_to(search_base))
+    except ValueError:
+        return os.path.relpath(path, search_base)
+
+
+def _load_basic_ignore_patterns(search_base: Path) -> list[str]:
+    patterns: list[str] = []
+    for ignore_file in (search_base / ".gitignore", search_base / ".ignore"):
+        try:
+            lines = ignore_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            pattern = line.strip()
+            if not pattern or pattern.startswith("#") or pattern.startswith("!"):
+                continue
+            patterns.append(pattern)
+    return patterns
+
+
+def _matches_basic_ignore_pattern(rel_path: str, pattern: str) -> bool:
+    normalized = rel_path.replace(os.sep, "/")
+    pattern = pattern.lstrip("/").replace(os.sep, "/")
+    if pattern.endswith("/"):
+        directory = pattern.rstrip("/")
+        return normalized == directory or normalized.startswith(f"{directory}/")
+    if "/" in pattern:
+        return fnmatch.fnmatch(normalized, pattern)
+    parts = normalized.split("/")
+    return any(fnmatch.fnmatch(part, pattern) for part in parts)
+
+
+def _is_ignored_by_basic_patterns(rel_path: str, patterns: list[str]) -> bool:
+    return any(_matches_basic_ignore_pattern(rel_path, pattern) for pattern in patterns)
+
+
+def _matches_python_type_filter(rel_path: str, file_type: str | None) -> bool:
+    if not file_type:
+        return True
+    globs = _PYTHON_FALLBACK_TYPE_GLOBS.get(file_type.lower())
+    if globs is None:
+        return False
+    return any(fnmatch.fnmatch(rel_path, glob_pattern) for glob_pattern in globs)
+
+
+def _iter_python_search_files(params: Params) -> list[Path]:
+    search_path = Path(os.path.expanduser(params.path))
+    search_base = search_path if search_path.is_dir() else search_path.parent
+    candidates = [search_path] if search_path.is_file() else search_path.rglob("*")
+    files: list[Path] = []
+    excluded_vcs = {".git", ".svn", ".hg", ".bzr", ".jj", ".sl"}
+    ignore_patterns = [] if params.include_ignored else _load_basic_ignore_patterns(search_base)
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        if any(part in excluded_vcs for part in candidate.parts):
+            continue
+        rel_path = _relative_output_path(candidate, search_base)
+        if ignore_patterns and _is_ignored_by_basic_patterns(rel_path, ignore_patterns):
+            continue
+        if params.glob and not fnmatch.fnmatch(rel_path, params.glob):
+            continue
+        if not _matches_python_type_filter(rel_path, params.type):
+            continue
+        files.append(candidate)
+    return files
+
+
+def _apply_python_pagination(lines: list[str], params: Params) -> tuple[list[str], str]:
+    message = ""
+    if params.offset > 0:
+        lines = lines[params.offset :]
+    effective_limit = params.head_limit
+    if effective_limit and len(lines) > effective_limit:
+        total = len(lines) + params.offset
+        lines = lines[:effective_limit]
+        message = (
+            f"Results truncated to {effective_limit} lines (total: {total}). "
+            f"Use offset={params.offset + effective_limit} to see more."
+        )
+    return lines, message
+
+
+def _python_grep(params: Params, unavailable_reason: str) -> ToolReturnValue:
+    builder = ToolResultBuilder()
+    flags = re.IGNORECASE if params.ignore_case else 0
+    if params.multiline:
+        flags |= re.DOTALL | re.MULTILINE
+    try:
+        pattern = re.compile(params.pattern, flags)
+    except re.error as exc:
+        return ToolError(message=f"Failed to grep. Error: {exc}", brief="Failed to grep")
+
+    search_path = Path(os.path.expanduser(params.path))
+    search_base = search_path if search_path.is_dir() else search_path.parent
+    matched_lines: list[str] = []
+    filtered_paths: list[str] = []
+
+    for file_path in _iter_python_search_files(params):
+        rel_path = _relative_output_path(file_path, search_base)
+        if is_sensitive_file(rel_path):
+            filtered_paths.append(rel_path)
+            continue
+        try:
+            text = file_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+
+        if params.output_mode == "files_with_matches":
+            if pattern.search(text):
+                matched_lines.append(rel_path)
+            continue
+
+        if params.output_mode == "count_matches":
+            count = len(pattern.findall(text))
+            if count:
+                matched_lines.append(f"{rel_path}:{count}")
+            continue
+
+        lines = text.splitlines()
+        matching_indexes = [idx for idx, line in enumerate(lines) if pattern.search(line)]
+        if params.context is not None:
+            before = after = params.context
+        else:
+            before = params.before_context or 0
+            after = params.after_context or 0
+        emitted: set[int] = set()
+        for match_idx in matching_indexes:
+            start = max(0, match_idx - before)
+            end = min(len(lines), match_idx + after + 1)
+            for idx in range(start, end):
+                if idx in emitted:
+                    continue
+                emitted.add(idx)
+                sep = ":" if idx == match_idx else "-"
+                line_no = f"{idx + 1}{sep}" if params.line_number else ""
+                matched_lines.append(f"{rel_path}{sep}{line_no}{lines[idx]}")
+
+    if params.output_mode == "files_with_matches":
+        matched_lines.sort(
+            key=lambda p: os.path.getmtime(search_base / p) if (search_base / p).exists() else 0,
+            reverse=True,
+        )
+
+    matched_lines, pagination_message = _apply_python_pagination(matched_lines, params)
+    messages = [f"ripgrep unavailable ({unavailable_reason}); used Python fallback."]
+    if filtered_paths:
+        messages.append(sensitive_file_warning(filtered_paths))
+    if pagination_message:
+        messages.append(pagination_message)
+
+    if not matched_lines:
+        return builder.ok(message="No matches found. " + " ".join(messages))
+    builder.write("\n".join(matched_lines))
+    return builder.ok(message=" ".join(messages))
+
+
 class Grep(CallableTool2[Params]):
     name: str = "Grep"
     description: str = load_desc(Path(__file__).parent / "grep.md")
@@ -393,7 +599,11 @@ class Grep(CallableTool2[Params]):
             message = ""
 
             # Build rg command
-            rg_path = await _ensure_rg_path()
+            try:
+                rg_path = await _ensure_rg_path()
+            except Exception as exc:
+                logger.warning("ripgrep unavailable, using Python fallback: {error}", error=exc)
+                return _python_grep(params, str(exc))
             logger.debug("Using ripgrep binary: {rg_bin}", rg_bin=rg_path)
             args = _build_rg_args(rg_path, params, single_threaded=_retry)
 

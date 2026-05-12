@@ -57,6 +57,15 @@ def test_load_default_agent_spec():
                 "Fast codebase exploration with prompt-enforced read-only behavior.",
             ),
             "plan": ("plan.yaml", "Read-only implementation planning and architecture design."),
+            "review": ("review.yaml", "Read-only code review with severity-scored findings."),
+            "implementer": (
+                "implementer.yaml",
+                "Scoped implementation with minimal edits and verification.",
+            ),
+            "verifier": (
+                "verifier.yaml",
+                "Read-only validation runner for tests, lint, and builds.",
+            ),
         }
     )
 
@@ -66,7 +75,25 @@ def test_load_default_agent_spec():
     assert subagent_specs["coder"].system_prompt_path == DEFAULT_AGENT_FILE.parent / "system.md"
     assert subagent_specs["coder"].system_prompt_args == snapshot(
         {
-            "ROLE_ADDITIONAL": "You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.\n"  # noqa: E501
+            "ROLE_ADDITIONAL": """\
+You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.
+
+Stay tightly scoped to exactly what the parent assigned. Do not expand into adjacent cleanup or refactors. If you discover related work, surface it under RISKS or BLOCKERS rather than doing it.
+
+Before editing, read the target files and confirm the line ranges/patterns you will change. Prefer the minimum edit that satisfies the brief. After edits, run the smallest relevant verification command available and report the result.
+
+Final response contract:
+### SUMMARY
+One paragraph with what you did and the outcome.
+### EVIDENCE
+Bullet list of concrete file paths, command results, or observed errors that support the outcome.
+### CHANGES
+Bullet list of every file you modified, or `None.` if read-only.
+### RISKS
+Bullet list of remaining risks or `None observed.`.
+### BLOCKERS
+Bullet list of anything that stopped completion, or `None.`.
+"""  # noqa: E501
         }
     )
     assert subagent_specs["coder"].when_to_use == snapshot(
@@ -129,7 +156,7 @@ def test_load_default_agent_spec():
             "ROLE_ADDITIONAL": """\
 You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.
 
-You are a codebase exploration specialist. Your role is EXCLUSIVELY to search, read, and analyze existing code and resources. You do NOT have access to file editing tools.
+You are a codebase exploration specialist. Your role is EXCLUSIVELY to search, read, and analyze existing code and resources. You do NOT have access to file editing tools. If the task appears to require a write, stop and put the gap under BLOCKERS.
 
 Your strengths:
 - Rapidly finding files using glob patterns
@@ -148,7 +175,19 @@ Guidelines:
 
 If the prompt includes a <git-context> block, use it to orient yourself about the repository state before starting your investigation.
 
-You are meant to be a fast agent. Complete the search request efficiently and report your findings clearly in a structured format.
+You are meant to be a fast agent. Complete the search request efficiently and report your findings clearly in a structured format. EVIDENCE is the load-bearing section: cite each important finding as `path:line-range` when possible, and stop once you have enough evidence rather than exhaustively reading the whole repository.
+
+Final response contract:
+### SUMMARY
+One paragraph with the headline answer.
+### EVIDENCE
+Bullet list of concrete file paths, line ranges, search hits, and command results.
+### CHANGES
+Always write `None.`.
+### RISKS
+Bullet list of uncertainties or `None observed.`.
+### BLOCKERS
+Bullet list of missing context/capabilities or `None.`.
 """  # noqa: E501
         }
     )
@@ -212,10 +251,21 @@ You are meant to be a fast agent. Complete the search request efficiently and re
             "ROLE_ADDITIONAL": """\
 You are now running as a subagent. All the `user` messages are sent by the main agent. The main agent cannot see your context, it can only see your last message when you finish the task. You must treat the parent agent as your caller. Do not directly ask the end user questions. If something is unclear, explain the ambiguity in your final summary to the parent agent.
 
-Before designing your implementation plan, consider whether you fully understand the codebase areas relevant to the task. If not, recommend the parent agent to use the explore agent (subagent_type="explore") to investigate key questions first. In your response, clearly state:
-1. What you already know from the information provided
-2. What questions remain unanswered that would benefit from explore agent investigation
-3. Your implementation plan (either preliminary if questions remain, or final if sufficient context exists)
+Before designing your implementation plan, consider whether you fully understand the codebase areas relevant to the task. If not, recommend the parent agent to use the explore agent (subagent_type="explore") to investigate key questions first.
+
+Ground the plan in evidence. Read enough files to avoid guessing, name the trade-offs, and choose one path with a reason. Each step should name the artifact it changes and the verification that proves it worked. Order steps by dependency first, then by risk reduced per effort.
+
+Final response contract:
+### SUMMARY
+One paragraph with the recommended plan and why.
+### EVIDENCE
+Bullet list of concrete file paths, line ranges, docs, or search hits that shaped the plan.
+### CHANGES
+Always write `None.` unless you wrote a plan artifact.
+### RISKS
+Bullet list of trade-offs, unknowns, or rollout risks.
+### BLOCKERS
+Bullet list of questions that must be answered before execution, or `None.`.
 """  # noqa: E501
         }
     )

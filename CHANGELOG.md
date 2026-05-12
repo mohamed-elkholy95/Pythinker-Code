@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 2.4.0 (2026-05-11)
+
+Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free Grep fallback.
+
+- New built-in subagents under `src/pythinker_code/agents/default/`:
+  - `implementer.yaml` — scoped code changes with minimum surrounding edits and a quick verification pass.
+  - `review.yaml` — read-only code review with severity-scored findings (BLOCKER / MAJOR / MINOR / NIT).
+  - `verifier.yaml` — read-only validation runner that reports `PASS` / `FAIL` / `FLAKY` without applying fixes.
+- `coder.yaml`, `explore.yaml`, and `plan.yaml` now emit a standard `### SUMMARY / EVIDENCE / CHANGES / RISKS / BLOCKERS` response contract so the parent agent can consume subagent output without re-parsing prose.
+- `agent.yaml` registers the three new roles; `tools/agent/description.md` documents the Scout → Plan → Implement → Review → Verify workflow and the parallel review/verification pattern.
+- `agents/default/system.md`: adds decomposition guidance (preview → todo list → parallel chunks), enforces post-tool-call verification before acting on results, and tells the agent to cross-check at least one load-bearing subagent finding before editing from it.
+- Kimi K2.5 / K2.6 (Moonshot) and other strict interleaved-thinking providers:
+  - `packages/pythinker-core/.../chat_provider/pythinker.py`: always emit `reasoning_content` on assistant tool-call replays so Moonshot's "thinking is enabled but reasoning_content is missing in assistant tool call message at index N" error no longer trips multi-step tool flows.
+  - `packages/pythinker-core/.../contrib/chat_provider/openai_legacy.py`: replay reasoning metadata on every assistant turn for `kimi-k2*` / `deepseek*` models (falls back to the assistant text or `"[reasoning unavailable]"` when reasoning content was not retained).
+  - `src/pythinker_code/llm.py`: route Kimi K2 thinking through the provider-specific `extra_body={"thinking": {"type": "enabled"|"disabled"}}` body field instead of OpenAI's `reasoning_effort` (which Kimi ignores), and persist `LLM.thinking` across `clone_llm_with_model_alias` so model switches preserve the user's thinking choice.
+- `tools/file/grep_local.py`:
+  - Pure-Python `rg`-free fallback (`_python_grep`) honoring `pattern`, `path`, `glob`, `type` (bash / c / cpp / go / java / js / json / md / py / rust / sh / toml / ts / txt / yaml / zsh), `ignore_case`, `multiline`, `context` / `before_context` / `after_context`, `line_number`, `output_mode` (`content` / `files_with_matches` / `count_matches`), `offset`, `head_limit`, and the standard sensitive-file redaction. `.gitignore` / `.ignore` and the VCS metadata directories (`.git`, `.svn`, `.hg`, `.bzr`, `.jj`, `.sl`) are respected unless `include_ignored=true`.
+  - `_find_existing_rg` now honors `PYTHINKER_RG_PATH` and additionally probes `/usr/bin`, `/usr/local/bin`, `~/.cargo/bin`, `~/.local/bin`, and `~/.pi/agent/bin` before falling through to download.
+  - Downloader retries against the upstream GitHub releases mirror (`https://github.com/BurntSushi/ripgrep/releases/download/<version>/...`) when the CDN mirror is unreachable, and the failure path now degrades into the Python fallback instead of raising.
+- `.gitignore`: ignore `graphify-out*/`, `.graphify_*.json`, `.graphify_*.txt`, and the local `blackbox/` scratch area.
+- `AGENTS.md` rewritten to reflect the new subagent roster and workflow.
+
 ## 2.3.0 (2026-05-09)
 
 Telemetry & observability audit.

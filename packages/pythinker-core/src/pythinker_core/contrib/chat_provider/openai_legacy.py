@@ -213,8 +213,19 @@ class OpenAILegacy:
         else:
             message.content = content
         dumped_message = message.model_dump(exclude_none=True)
-        if reasoning_content and self._reasoning_key:
-            dumped_message[self._reasoning_key] = reasoning_content
+        if self._reasoning_key:
+            # Moonshot/Kimi (and similar interleaved-thinking providers) require
+            # consistent reasoning replay metadata on assistant history. At a
+            # minimum tool-call turns need the field, and known strict models
+            # are safest when all assistant turns include it, even if empty.
+            has_tool_calls = message.role == "assistant" and bool(message.tool_calls)
+            strict_interleaved = message.role == "assistant" and _is_strict_interleaved_model(
+                self.model
+            )
+            if reasoning_content or has_tool_calls or strict_interleaved:
+                if strict_interleaved and not reasoning_content:
+                    reasoning_content = message.extract_text() or "[reasoning unavailable]"
+                dumped_message[self._reasoning_key] = reasoning_content
         return cast(ChatCompletionMessageParam, dumped_message)
 
 
@@ -330,6 +341,11 @@ class OpenAILegacyStreamedMessage:
                         pass
         except (OpenAIError, httpx.HTTPError) as e:
             raise convert_error(e) from e
+
+
+def _is_strict_interleaved_model(model_name: str) -> bool:
+    normalized = model_name.lower().replace("_", "-")
+    return "kimi-k2" in normalized or "deepseek" in normalized
 
 
 if __name__ == "__main__":

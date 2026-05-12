@@ -28,6 +28,15 @@ async def grep_tool() -> Grep:
     return Grep()
 
 
+def test_find_existing_rg_honors_env_path(monkeypatch, tmp_path):
+    rg_path = tmp_path / _rg_binary_name()
+    rg_path.write_text("fake rg")
+    rg_path.chmod(0o755)
+    monkeypatch.setenv("PYTHINKER_RG_PATH", str(rg_path))
+
+    assert _find_existing_rg(_rg_binary_name()) == rg_path
+
+
 @pytest.fixture
 def temp_test_files():
     """Create temporary test files for grep testing."""
@@ -86,6 +95,66 @@ async def test_grep_files_with_matches(grep_tool: Grep, temp_test_files):
     assert "test1.py" in result.output
     assert "test2.js" in result.output
     assert "readme.txt" in result.output
+
+
+async def test_grep_falls_back_to_python_when_ripgrep_unavailable(monkeypatch, temp_test_files):
+    """Grep should still handle basic searches when rg cannot be found or downloaded."""
+
+    async def fail_rg_path() -> str:
+        raise RuntimeError("Failed to download ripgrep binary")
+
+    monkeypatch.setattr("pythinker_code.tools.file.grep_local._ensure_rg_path", fail_rg_path)
+    temp_dir, _ = temp_test_files
+
+    result = await Grep()(Params(pattern="hello|sub_hello", path=temp_dir, output_mode="content"))
+
+    assert not result.is_error
+    assert isinstance(result.output, str)
+    assert "test1.py:1:def hello_world():" in result.output
+    assert "subdir/subtest.py:1:def sub_hello():" in result.output
+
+
+async def test_grep_python_fallback_honors_type_filter(monkeypatch, temp_test_files):
+    """Fallback should not silently drop searches that use common rg type filters."""
+
+    async def fail_rg_path() -> str:
+        raise RuntimeError("Failed to download ripgrep binary")
+
+    monkeypatch.setattr("pythinker_code.tools.file.grep_local._ensure_rg_path", fail_rg_path)
+    temp_dir, _ = temp_test_files
+
+    result = await Grep()(
+        Params(pattern="hello", path=temp_dir, output_mode="files_with_matches", type="py")
+    )
+
+    assert not result.is_error
+    assert isinstance(result.output, str)
+    assert "test1.py" in result.output
+    assert "subdir/subtest.py" in result.output
+    assert "test2.js" not in result.output
+
+
+async def test_grep_python_fallback_honors_basic_gitignore(monkeypatch, tmp_path):
+    """Fallback should preserve rg's default behavior of skipping ignored files."""
+
+    async def fail_rg_path() -> str:
+        raise RuntimeError("Failed to download ripgrep binary")
+
+    monkeypatch.setattr("pythinker_code.tools.file.grep_local._ensure_rg_path", fail_rg_path)
+    (tmp_path / ".gitignore").write_text("ignored.txt\nignored_dir/\n")
+    (tmp_path / "kept.txt").write_text("needle\n")
+    (tmp_path / "ignored.txt").write_text("needle\n")
+    ignored_dir = tmp_path / "ignored_dir"
+    ignored_dir.mkdir()
+    (ignored_dir / "nested.txt").write_text("needle\n")
+
+    result = await Grep()(Params(pattern="needle", path=str(tmp_path), output_mode="content"))
+
+    assert not result.is_error
+    assert isinstance(result.output, str)
+    assert "kept.txt" in result.output
+    assert "ignored.txt" not in result.output
+    assert "ignored_dir/nested.txt" not in result.output
 
 
 async def test_grep_content_mode(grep_tool: Grep, temp_test_files):

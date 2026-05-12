@@ -8,7 +8,7 @@ from httpx import Response
 from inline_snapshot import snapshot
 
 from pythinker_core.contrib.chat_provider.openai_legacy import OpenAILegacy
-from pythinker_core.message import Message, TextPart, ThinkPart
+from pythinker_core.message import Message, TextPart, ThinkPart, ToolCall
 
 TEST_CASES: dict[str, Case] = {**COMMON_CASES}
 
@@ -393,3 +393,100 @@ async def test_openai_legacy_no_auto_reasoning_effort_without_reasoning_key():
             pass
         body = json.loads(mock.calls.last.request.content.decode())
         assert "reasoning_effort" not in body
+
+
+async def test_openai_legacy_reasoning_content_forced_on_assistant_tool_calls():
+    """Assistant messages carrying tool calls must include `reasoning_content` (even when
+    empty) for Moonshot/Kimi-style providers that enforce it on history replay.
+
+    Reproduces: "thinking is enabled but reasoning_content is missing in assistant tool
+    call message at index N" error from Moonshot AI when replaying tool-call history.
+    """
+    with respx.mock(base_url="https://api.openai.com") as mock:
+        mock.post("/v1/chat/completions").mock(
+            return_value=Response(200, json=make_chat_completion_response())
+        )
+        provider = OpenAILegacy(
+            model="kimi-k2.6",
+            api_key="test-key",
+            stream=False,
+            reasoning_key="reasoning_content",
+        )
+        history = [
+            Message(role="user", content="List files"),
+            # Assistant turn with tool calls but NO ThinkPart — the failure mode.
+            Message(
+                role="assistant",
+                content=[],
+                tool_calls=[
+                    ToolCall(
+                        id="call_1",
+                        function=ToolCall.FunctionBody(name="ls", arguments="{}"),
+                    ),
+                ],
+            ),
+            Message(role="tool", tool_call_id="call_1", content="file1.txt"),
+            Message(role="user", content="thanks"),
+        ]
+        stream = await provider.generate("", [], history)
+        async for _ in stream:
+            pass
+        body = json.loads(mock.calls.last.request.content.decode())
+        assistant_msg = body["messages"][1]
+        assert assistant_msg["role"] == "assistant"
+        assert assistant_msg.get("tool_calls"), "tool_calls should be on the assistant msg"
+        # The fix: reasoning_content is present and non-empty so Moonshot/OpenCode Go
+        # bridges that strip empty strings still forward valid replay metadata.
+        assert "reasoning_content" in assistant_msg
+        assert assistant_msg["reasoning_content"] == "[reasoning unavailable]"
+
+
+async def test_openai_legacy_reasoning_content_not_forced_on_plain_assistant():
+    """Generic OpenAI-compatible providers must not receive empty reasoning fields on
+    plain assistant text turns. The stricter replay invariant is scoped to known
+    interleaved-thinking providers like Kimi/DeepSeek."""
+    with respx.mock(base_url="https://api.openai.com") as mock:
+        mock.post("/v1/chat/completions").mock(
+            return_value=Response(200, json=make_chat_completion_response())
+        )
+        provider = OpenAILegacy(
+            model="plain-model",
+            api_key="test-key",
+            stream=False,
+            reasoning_key="reasoning_content",
+        )
+        history = [
+            Message(role="user", content="hi"),
+            Message(role="assistant", content="hello"),
+            Message(role="user", content="bye"),
+        ]
+        stream = await provider.generate("", [], history)
+        async for _ in stream:
+            pass
+        body = json.loads(mock.calls.last.request.content.decode())
+        assert "reasoning_content" not in body["messages"][1]
+
+
+async def test_openai_legacy_reasoning_content_forced_on_known_interleaved_plain_assistant():
+    """Kimi/DeepSeek-style interleaved-thinking providers need consistent assistant
+    replay metadata across turns, not only on turns where visible reasoning text exists."""
+    with respx.mock(base_url="https://api.openai.com") as mock:
+        mock.post("/v1/chat/completions").mock(
+            return_value=Response(200, json=make_chat_completion_response())
+        )
+        provider = OpenAILegacy(
+            model="kimi-k2.6",
+            api_key="test-key",
+            stream=False,
+            reasoning_key="reasoning_content",
+        )
+        history = [
+            Message(role="user", content="hi"),
+            Message(role="assistant", content="hello"),
+            Message(role="user", content="next"),
+        ]
+        stream = await provider.generate("", [], history)
+        async for _ in stream:
+            pass
+        body = json.loads(mock.calls.last.request.content.decode())
+        assert body["messages"][1]["reasoning_content"] == "hello"

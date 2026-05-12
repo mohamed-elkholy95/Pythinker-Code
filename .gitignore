@@ -28,6 +28,11 @@ src/pythinker_code/web/static/assets/
 src/pythinker_code/vis/static/
 
 # Generated reports
+# Graphify generated graph, cache, wiki, and Obsidian vault outputs
+graphify-out/
+graphify-out*/
+.graphify_*.json
+.graphify_*.txt
 tests_ai/report.json
 tests_ai/terminal_bench_2_cache/
 jobs/
@@ -49,3 +54,4 @@ static/
 .entire
 .claude
 .worktrees/
+blackbox/
