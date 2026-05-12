@@ -34,3 +34,12 @@ agent:
     plan:
       path: ./plan.yaml
       description: "Read-only implementation planning and architecture design."
+    review:
+      path: ./review.yaml
+      description: "Read-only code review with severity-scored findings."
+    implementer:
+      path: ./implementer.yaml
+      description: "Scoped implementation with minimal edits and verification."
+    verifier:
+      path: ./verifier.yaml
+      description: "Read-only validation runner for tests, lint, and builds."

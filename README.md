@@ -48,6 +48,20 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
+## 🆕 What's New in 2.4.0
+
+Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free Grep fallback.
+
+- **New subagents** — `implementer` (scoped edits + verification), `review` (severity-scored read-only review), and `verifier` (`PASS` / `FAIL` / `FLAKY` validation runner). Join the existing `coder` / `explore` / `plan` roster.
+- **Structured subagent output** — every default agent now answers with `### SUMMARY / EVIDENCE / CHANGES / RISKS / BLOCKERS`, so the parent agent can consume results without re-parsing prose. New recommended flow: **Scout → Plan → Implement → Review → Verify** (review and verify can run in parallel).
+- **Kimi K2.5 / K2.6 (Moonshot) support** — `--thinking` is routed via the provider-specific `thinking.type` body field, and assistant tool-call replays always carry `reasoning_content` so multi-step tool flows stop tripping Moonshot's strict thinking-replay check. Same hardening applied to DeepSeek's strict mode.
+- **`Grep` works without `rg`** — pure-Python fallback honors `pattern` / `glob` / `type` / `ignore_case` / `multiline` / `context` / `output_mode` / `offset` / `head_limit` and respects `.gitignore`. The downloader also retries against the upstream GitHub releases mirror and accepts `PYTHINKER_RG_PATH=/absolute/path` plus extra discovery paths (`~/.cargo/bin`, `~/.local/bin`, `~/.pi/agent/bin`, `/usr/bin`, `/usr/local/bin`).
+- **`AGENTS.md` rewritten** to match the new roster, and `tools/agent/description.md` documents the parallel-review and cross-check patterns.
+
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.4.0`.
+
+### What was new in 2.3.0
+
 ## 🆕 What's New in 2.3.0
 
 Telemetry & observability audit on top of 2.2.1.
@@ -58,8 +72,6 @@ Telemetry & observability audit on top of 2.2.1.
 - **`pythinker.mcp.call` span** with `mcp.server` attribute.
 - **`docs/en/reference/telemetry.md`** documents the full contract.
 
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.3.0`.
-
 ### What was new in 2.2.1
 
 ## 🆕 What's New in 2.2.1
@@ -68,8 +80,6 @@ CI hardening on top of 2.2.0.
 
 - **macOS binary build is now optional-codesign** — the release workflow detects whether `APPLE_CERTIFICATE_P12` / `APPLE_NOTARIZATION_KEY_P8` repo secrets are set. When they aren't (the v2.2.0 case), it ships an ad-hoc-signed PyInstaller binary instead of failing the whole release. PyPI install (`pip install pythinker-code`) is unaffected.
 - **PyPI publish is idempotent** — `pypa/gh-action-pypi-publish` now runs with `skip-existing: true`, so re-running the release workflow against an already-published version is a no-op.
-
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.3.0`.
 
 ### What was new in 2.2.0
 

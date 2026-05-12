@@ -5,7 +5,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast, get_args
+from typing import TYPE_CHECKING, Any, Literal, cast, get_args
 
 from pydantic import SecretStr
 from pythinker_core.chat_provider import ChatProvider
@@ -42,6 +42,7 @@ class LLM:
     capabilities: set[ModelCapability]
     model_config: LLMModel | None = None
     provider_config: LLMProvider | None = None
+    thinking: bool | None = None
 
     @property
     def model_name(self) -> str:
@@ -316,9 +317,10 @@ def create_llm(
     thinking_on = "always_thinking" in capabilities or (
         thinking is True and "thinking" in capabilities
     )
-    if thinking_on:
+    is_kimi_openai_legacy = provider.type == "openai_legacy" and _is_kimi_k2_model(model.model)
+    if thinking_on and not is_kimi_openai_legacy:
         chat_provider = chat_provider.with_thinking("high")
-    elif thinking is False and "thinking" in capabilities:
+    elif thinking is False and "thinking" in capabilities and not is_kimi_openai_legacy:
         # Only explicitly send `reasoning_effort: null` for models that actually
         # support reasoning. For models without the thinking capability, omit
         # the field entirely — some providers (e.g., Alibaba via OpenAI-compat)
@@ -327,6 +329,19 @@ def create_llm(
         chat_provider = chat_provider.with_thinking("off")
     # If thinking is None, or thinking is False on a non-reasoning model, leave
     # the chat provider's default reasoning_effort (Omit) untouched.
+
+    # Kimi K2.5/K2.6 use an OpenAI-compatible API but their thinking toggle is
+    # the provider-specific `thinking.type` body field rather than OpenAI's
+    # `reasoning_effort`. Kimi defaults thinking to enabled, so when Pythinker
+    # config says thinking is off we must send the explicit Kimi switch;
+    # otherwise multi-step tool calls can still enter thinking mode and require
+    # `reasoning_content` on replayed tool-call turns.
+    if is_kimi_openai_legacy:
+        thinking_type = "enabled" if thinking_on else "disabled" if thinking is False else None
+        if thinking_type is not None:
+            chat_provider = cast(Any, chat_provider).with_generation_kwargs(
+                extra_body={"thinking": {"type": thinking_type}}
+            )
 
     # Apply Pythinker AI-specific ``thinking.keep`` (preserved thinking) only when
     # the model is actually in thinking mode; otherwise the API would see a
@@ -345,6 +360,7 @@ def create_llm(
         capabilities=capabilities,
         model_config=model,
         provider_config=provider,
+        thinking=thinking,
     )
 
 
@@ -362,8 +378,8 @@ def clone_llm_with_model_alias(
         raise KeyError(f"Unknown model alias: {model_alias}")
     model = config.models[model_alias]
     provider = config.providers[model.provider]
-    thinking: bool | None = None
-    if llm is not None:
+    thinking: bool | None = llm.thinking if llm is not None else None
+    if thinking is None and llm is not None:
         effort = getattr(llm.chat_provider, "thinking_effort", None)
         if effort is not None:
             thinking = effort != "off"
@@ -378,13 +394,24 @@ def clone_llm_with_model_alias(
 
 def derive_model_capabilities(model: LLMModel) -> set[ModelCapability]:
     capabilities = set(model.capabilities or ())
+    model_name = model.model.lower()
+    # Kimi K2.5/K2.6 support thinking, but it can be disabled via
+    # `thinking.type`. Keep them out of always_thinking so --no-thinking and the
+    # default_thinking=false config path can send the provider-specific disable
+    # switch in create_llm().
+    if _is_kimi_k2_model(model.model):
+        capabilities.add("thinking")
     # Models with "thinking" in their name are always-thinking models
-    if "thinking" in model.model.lower() or "reason" in model.model.lower():
+    elif "thinking" in model_name or "reason" in model_name:
         capabilities.update(("thinking", "always_thinking"))
     # These models support thinking but can be toggled on/off
     elif model.model in {"pythinker-for-coding", "pythinker-code"}:
         capabilities.update(("thinking", "image_in", "video_in"))
     return capabilities
+
+
+def _is_kimi_k2_model(model_name: str) -> bool:
+    return "kimi-k2" in model_name.lower().replace("_", "-")
 
 
 def _load_scripted_echo_scripts() -> list[str]:

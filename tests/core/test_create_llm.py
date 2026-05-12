@@ -7,8 +7,13 @@ from pythinker_core.chat_provider.pythinker import Pythinker
 from pythinker_core.contrib.chat_provider.openai_legacy import OpenAILegacy
 from pythinker_core.contrib.chat_provider.openai_responses import OpenAIResponses
 
-from pythinker_code.config import LLMModel, LLMProvider
-from pythinker_code.llm import augment_provider_with_env_vars, create_llm
+from pythinker_code.config import Config, LLMModel, LLMProvider
+from pythinker_code.llm import (
+    augment_provider_with_env_vars,
+    clone_llm_with_model_alias,
+    create_llm,
+    derive_model_capabilities,
+)
 
 
 def test_augment_provider_with_env_vars_pythinker(monkeypatch):
@@ -601,3 +606,97 @@ def test_create_llm_pythinker_thinking_keep_injected_on_explicit_thinking_true(m
     assert llm.chat_provider.model_parameters.get("extra_body") == snapshot(
         {"thinking": {"type": "enabled", "keep": "all"}}
     )
+
+
+def test_derive_model_capabilities_marks_kimi_k2_as_toggleable_thinking():
+    model = LLMModel(
+        provider="openai-compatible",
+        model="kimi-k2.6",
+        max_context_size=262_000,
+        capabilities=None,
+    )
+
+    assert derive_model_capabilities(model) == {"thinking"}
+
+
+def test_create_llm_openai_legacy_kimi_sends_disabled_thinking_body():
+    provider = LLMProvider(
+        type="openai_legacy",
+        base_url="https://api.moonshot.ai/v1",
+        api_key=SecretStr("test-key"),
+    )
+    model = LLMModel(
+        provider="moonshot",
+        model="kimi-k2.6",
+        max_context_size=262_000,
+        capabilities=None,
+    )
+
+    llm = create_llm(provider, model, thinking=False)
+    assert llm is not None
+    assert isinstance(llm.chat_provider, OpenAILegacy)
+    assert llm.capabilities == {"thinking"}
+    # Kimi uses `extra_body.thinking.type`, not OpenAI's `reasoning_effort`.
+    assert llm.chat_provider.thinking_effort is None
+    assert llm.chat_provider._generation_kwargs.get("extra_body") == {  # pyright: ignore[reportPrivateUsage]
+        "thinking": {"type": "disabled"}
+    }
+
+
+def test_create_llm_openai_legacy_kimi_sends_enabled_thinking_body():
+    provider = LLMProvider(
+        type="openai_legacy",
+        base_url="https://api.moonshot.ai/v1",
+        api_key=SecretStr("test-key"),
+    )
+    model = LLMModel(
+        provider="moonshot",
+        model="kimi-k2.6",
+        max_context_size=262_000,
+        capabilities=None,
+    )
+
+    llm = create_llm(provider, model, thinking=True)
+    assert llm is not None
+    assert isinstance(llm.chat_provider, OpenAILegacy)
+    # Kimi uses `extra_body.thinking.type`, not OpenAI's `reasoning_effort`.
+    assert llm.chat_provider.thinking_effort is None
+    assert llm.chat_provider._generation_kwargs.get("extra_body") == {  # pyright: ignore[reportPrivateUsage]
+        "thinking": {"type": "enabled"}
+    }
+
+
+def test_clone_llm_with_model_alias_preserves_kimi_thinking_disabled():
+    provider = LLMProvider(
+        type="openai_legacy",
+        base_url="https://opencode.ai/zen/go/v1",
+        api_key=SecretStr("test-key"),
+    )
+    model = LLMModel(
+        provider="managed:opencode-go-openai",
+        model="kimi-k2.6",
+        max_context_size=262_000,
+        capabilities=None,
+    )
+    config = Config()
+    config.providers[model.provider] = provider
+    config.models["opencode-go/kimi-k2.6"] = model
+
+    parent = create_llm(provider, model, thinking=False)
+    assert parent is not None
+
+    cloned = clone_llm_with_model_alias(
+        parent,
+        config,
+        "opencode-go/kimi-k2.6",
+        session_id="sess-123",
+        oauth=None,
+    )
+
+    assert cloned is not None
+    assert isinstance(cloned.chat_provider, OpenAILegacy)
+    assert cloned.thinking is False
+    assert cloned.chat_provider.thinking_effort is None
+    assert cloned.chat_provider._generation_kwargs.get("extra_body") == {  # pyright: ignore[reportPrivateUsage]
+        "thinking": {"type": "disabled"}
+    }

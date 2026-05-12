@@ -16,7 +16,10 @@ ${BUILTIN_AGENT_TYPES_MD}
 - Use `resume` when you want to continue an existing instance instead of starting a new one.
 - If an existing subagent already has relevant context or the task is a continuation of its prior work, prefer `resume` over creating a new instance.
 - Default to foreground execution. Use `run_in_background=true` only when the task can continue independently, you do not need the result immediately, and there is a clear benefit to returning control before it finishes.
-- Be explicit about whether the subagent should write code or only do research.
+- Be explicit about whether the subagent should write code, only research, review, or verify.
+- Provide the subagent all required context and success criteria. New subagents do not inherit your transcript automatically.
+- Spawn multiple subagents in the same turn when they can investigate independent regions concurrently.
+- Cross-check at least one load-bearing subagent finding before making changes from it.
 - The subagent result is only visible to you. If the user should see it, summarize it yourself.
 
 **Agent Workflow Design**
@@ -25,13 +28,17 @@ Use subagents as focused logical roles, not just extra tool capacity:
 
 - `explore` / scout: collect facts, relevant files, constraints, and risks. Read-only.
 - `plan`: turn gathered context into an implementation plan. Read-only.
-- `coder`: implement or revise code from a concrete brief/plan.
+- `coder`: general software engineering work when the brief still needs judgment.
+- `implementer`: land a specific, already-scoped change with minimum edits.
+- `review`: read and grade changed code with severity-scored findings.
+- `verifier`: run validation gates and report PASS / FAIL / FLAKY without fixing.
 
 Recommended workflows:
 
-- Scout → Plan → Implement: run `explore`, then `plan` with the explorer's findings, then `coder` with the plan.
-- Implement → Review → Fix: run `coder`, then a read-only review using `explore` or `plan`, then resume/launch `coder` to apply feedback.
+- Scout → Plan → Implement: run `explore`, then `plan` with the explorer's findings, then `implementer` or `coder` with the plan.
+- Implement → Review → Fix → Verify: run `implementer`, then `review`, then resume/launch `implementer` to apply feedback, then `verifier` for the relevant gate.
 - Parallel scouting: launch multiple `explore` agents for independent questions, then synthesize their findings before editing.
+- Parallel review/verification: when review and tests do not depend on each other, run `review` and `verifier` concurrently.
 
 When chaining manually, include the previous agent's summary in the next agent prompt. Newly-created
 subagents do not see your current context automatically.

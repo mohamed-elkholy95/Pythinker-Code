@@ -177,6 +177,7 @@ async def test_pythinker_message_conversion():
                                     "function": {"name": "add", "arguments": '{"a": 2, "b": 3}'},
                                 }
                             ],
+                            "reasoning_content": "",
                         },
                         {
                             "role": "tool",
@@ -208,6 +209,7 @@ async def test_pythinker_message_conversion():
                                     "function": {"name": "add", "arguments": '{"a": 2, "b": 3}'},
                                 }
                             ],
+                            "reasoning_content": "",
                         },
                         {"role": "tool", "content": "5", "tool_call_id": "call_abc123"},
                     ],
@@ -237,6 +239,7 @@ async def test_pythinker_message_conversion():
                                     },
                                 },
                             ],
+                            "reasoning_content": "",
                         },
                         {
                             "role": "tool",
@@ -329,6 +332,7 @@ async def test_pythinker_message_conversion():
                                     "function": {"name": "add", "arguments": '{"a": 2, "b": 3}'},
                                 }
                             ],
+                            "reasoning_content": "",
                         },
                         {"role": "tool", "content": "5", "tool_call_id": "call_abc123"},
                     ],
