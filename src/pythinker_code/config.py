@@ -274,9 +274,9 @@ class Config(BaseModel):
         ),
     )
     telemetry: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "Enable anonymous telemetry to help improve pythinker-code. Set to true to enable."
+            "Enable anonymous telemetry to help improve pythinker-code. Set to false to opt out."
         ),
     )
 

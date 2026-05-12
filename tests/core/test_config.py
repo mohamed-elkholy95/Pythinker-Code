@@ -58,7 +58,7 @@ def test_default_config_dump():
             "hooks": [],
             "merge_all_available_skills": True,
             "extra_skill_dirs": [],
-            "telemetry": False,
+            "telemetry": True,
             "skip_auto_prompt_injection": False,
             "tui": {"style": "card"},
         }

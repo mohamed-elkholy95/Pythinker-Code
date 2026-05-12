@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
@@ -102,6 +103,21 @@ FLOW_COMMAND_PREFIX = "flow:"
 DEFAULT_MAX_FLOW_MOVES = 1000
 
 
+def classify_llm_system(chat_provider: object | None) -> str:
+    """Classify a chat provider into a stable gen_ai.system telemetry value."""
+    try:
+        provider_class = type(chat_provider).__name__.lower() if chat_provider is not None else ""
+        if "anthropic" in provider_class:
+            return "anthropic"
+        if "openai" in provider_class:
+            return "openai"
+        if "google" in provider_class or "gemini" in provider_class:
+            return "google"
+        return provider_class or "unknown"
+    except Exception:
+        return "unknown"
+
+
 def classify_api_error(e: Exception) -> tuple[str, int | None]:
     """Classify an LLM API exception into (error_type, status_code).
 
@@ -193,6 +209,7 @@ class PythinkerSoul:
             self._checkpoint_with_user_message = False
 
         self._steer_queue: asyncio.Queue[str | list[ContentPart]] = asyncio.Queue()
+        self._prompt_queue_lock = asyncio.Lock()
         self._plan_mode: bool = self._runtime.session.state.plan_mode
         self._plan_session_id: str | None = self._runtime.session.state.plan_session_id
         # Pre-warm slug cache so the persisted slug survives process restarts
@@ -600,6 +617,7 @@ class PythinkerSoul:
         *,
         skip_user_prompt_hook: bool = False,
     ):
+        await self._prompt_queue_lock.acquire()
         approval_source_token = None
         created_approval_source: ApprovalSource | None = None
         turn_started = False
@@ -723,6 +741,7 @@ class PythinkerSoul:
                 )
             if approval_source_token is not None:
                 reset_current_approval_source(approval_source_token)
+            self._prompt_queue_lock.release()
 
     async def _turn(self, user_message: Message) -> TurnOutcome:
         from pythinker_code.extensions import shared_event_bus
@@ -994,10 +1013,14 @@ class PythinkerSoul:
                 from pythinker_code.telemetry import track
 
                 error_type, status_code = classify_api_error(e)
+                api_error_props: dict[str, bool | int | float | str | None] = {
+                    "error_type": error_type,
+                    "gen_ai_system": classify_llm_system(self._runtime.llm.chat_provider),
+                    "model": self._runtime.llm.chat_provider.model_name,
+                }
                 if status_code is not None:
-                    track("api_error", error_type=error_type, status_code=status_code)
-                else:
-                    track("api_error", error_type=error_type)
+                    api_error_props["status_code"] = status_code
+                track("api_error", **api_error_props)
                 # --- StopFailure hook ---
                 from pythinker_code.hooks import events as _hook_events
 
@@ -1097,19 +1120,8 @@ class PythinkerSoul:
             from pythinker_code.telemetry import metrics as _m
             from pythinker_code.telemetry import otel as _otel
 
-            # Resolve gen_ai.system once so both span and metric agree.
-            try:
-                provider_class = type(chat_provider).__name__.lower()
-                if "anthropic" in provider_class:
-                    gen_ai_system = "anthropic"
-                elif "openai" in provider_class:
-                    gen_ai_system = "openai"
-                elif "google" in provider_class or "gemini" in provider_class:
-                    gen_ai_system = "google"
-                else:
-                    gen_ai_system = provider_class
-            except Exception:
-                gen_ai_system = "unknown"
+            # Resolve gen_ai.system once so spans and metrics agree.
+            gen_ai_system = classify_llm_system(chat_provider)
 
             with _otel.start_span(
                 "pythinker.llm",
@@ -1120,14 +1132,32 @@ class PythinkerSoul:
                 },
             ) as span:
                 llm_t0 = time.monotonic()
-                step_result = await pythinker_core.step(
-                    chat_provider,
-                    self._agent.system_prompt,
-                    self._agent.toolset,
-                    effective_history,
-                    on_message_part=wire_send,
-                    on_tool_result=wire_send,
-                )
+                try:
+                    step_result = await pythinker_core.step(
+                        chat_provider,
+                        self._agent.system_prompt,
+                        self._agent.toolset,
+                        effective_history,
+                        on_message_part=wire_send,
+                        on_tool_result=wire_send,
+                    )
+                except Exception as exc:
+                    llm_elapsed = time.monotonic() - llm_t0
+                    error_type, status_code = classify_api_error(exc)
+                    with contextlib.suppress(Exception):
+                        span.set_attribute("error.type", error_type)
+                        if status_code is not None:
+                            span.set_attribute("http.response.status_code", status_code)
+                    with contextlib.suppress(Exception):
+                        _m.record_llm_call(
+                            duration_seconds=llm_elapsed,
+                            system=gen_ai_system,
+                            model=chat_provider.model_name,
+                            success=False,
+                        )
+                    with contextlib.suppress(Exception):
+                        _m.record_error(kind="api_error", error_type=error_type)
+                    raise
                 llm_elapsed = time.monotonic() - llm_t0
                 # Attach response details — usage may be None on partial / cached responses.
                 if step_result.id:
@@ -1343,6 +1373,8 @@ class PythinkerSoul:
         wire_send(CompactionBegin())
         try:
             compaction_result = await _compact_with_retry()
+            if not compaction_result.messages:
+                raise RuntimeError("Compaction produced no messages; preserving existing history")
         except Exception:
             from pythinker_code.telemetry import track
 

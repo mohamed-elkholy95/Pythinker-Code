@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import override
+from typing import Literal, override
 
 from pydantic import BaseModel, Field
 from pythinker_core.tooling import CallableTool2, ToolError, ToolReturnValue
@@ -54,6 +54,26 @@ class Params(BaseModel):
         ),
         ge=30,
         le=MAX_BACKGROUND_TIMEOUT,
+    )
+    dependencies: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional background task IDs this task depends on. Metadata only; the parent "
+            "agent should launch dependent tasks after prerequisites are ready."
+        ),
+    )
+    budget_seconds: int | None = Field(
+        default=None,
+        description="Optional budget in seconds for planning/synthesis metadata.",
+        ge=1,
+        le=MAX_BACKGROUND_TIMEOUT,
+    )
+    isolation: Literal["none", "worktree"] = Field(
+        default="none",
+        description=(
+            "Optional isolation request for background agents. `worktree` records a git-worktree "
+            "isolation intent for orchestration/recovery; unsupported callers should leave `none`."
+        ),
     )
 
     @property
@@ -216,6 +236,9 @@ class AgentTool(CallableTool2[Params]):
                         subagent_type=actual_type,
                         model_override=params.model,
                         effective_model=params.model or type_def.default_model,
+                        thinking=self._runtime.llm.thinking
+                        if self._runtime.llm is not None
+                        else None,
                     ),
                 )
                 created_instance = True
@@ -237,6 +260,9 @@ class AgentTool(CallableTool2[Params]):
                     model_override=params.model,
                     timeout_s=params.effective_timeout,
                     resumed=params.resume is not None,
+                    dependencies=params.dependencies,
+                    budget_seconds=params.budget_seconds,
+                    isolation=params.isolation,
                 )
             except Exception:
                 self._runtime.subagent_store.update_instance(
@@ -246,6 +272,10 @@ class AgentTool(CallableTool2[Params]):
                 if created_instance:
                     self._runtime.subagent_store.delete_instance(agent_id)
                 raise
+            dependency_text = ", ".join(params.dependencies) if params.dependencies else "(none)"
+            budget_text = (
+                str(params.budget_seconds) if params.budget_seconds is not None else "(none)"
+            )
             lines = [
                 f"task_id: {view.spec.id}",
                 f"kind: {view.spec.kind}",
@@ -253,6 +283,10 @@ class AgentTool(CallableTool2[Params]):
                 f"description: {view.spec.description}",
                 f"agent_id: {agent_id}",
                 f"actual_subagent_type: {actual_type}",
+                f"dependencies: {dependency_text}",
+                f"budget_seconds: {budget_text}",
+                f"isolation: {params.isolation}",
+                f"synthesis_state: {view.spec.synthesis_state or 'pending'}",
                 "automatic_notification: true",
                 "next_step: You will be automatically notified when it completes.",
                 (
