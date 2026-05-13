@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 2.6.0 (2026-05-13)
+
+Packaging fix: pin `pythinker-core[contrib]==1.1.0` so the Kimi K2.x / DeepSeek strict-interleaved reasoning-replay fix reaches PyPI installs.
+
+### Why 2.6.0 lands the same day as 2.5.0
+
+The runtime fix for Moonshot's `thinking is enabled but reasoning_content is missing in assistant tool call message at index N` rejection landed in the `pythinker-core` source tree on 2026-05-11 (released in `pythinker-code` 2.4.0 source), but **the published `pythinker-core==1.0.0` on PyPI predates that change** (uploaded 2026-05-07). `pythinker-code` 2.4.0 and 2.5.0 both pinned `pythinker-core[contrib]==1.0.0`, so PyPI users on Kimi K2.5 / K2.6 / DeepSeek through OpenCode Go (and elsewhere) kept hitting the bug even on the latest CLI. Reported in [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37).
+
+### The fix
+
+- **`pythinker-core` bumped to 1.1.0** (published independently on PyPI) — carries the strict-interleaved replay logic that emits `reasoning_content` on every assistant turn for `kimi-k2*` / `deepseek*` models, falling back to `extract_text()` then `"[reasoning unavailable]"` when no `ThinkPart` was captured.
+- **Root pin updated to `pythinker-core[contrib]==1.1.0`** in `pyproject.toml`. New installs of `pip install --upgrade pythinker-code==2.6.0` (and `uv tool install`/`upgrade`) get the fix automatically.
+- See `packages/pythinker-core/CHANGELOG.md` for the full pythinker-core 1.1.0 entry.
+
+### No app-level behavior changes vs 2.5.0
+
+Everything that landed in 2.5.0 is still there. The 2.6.0 diff is exclusively the version bump and the upstream-dep pin; existing 2.5.0 users **must** upgrade to 2.6.0 if they use Kimi K2.x, DeepSeek, or any other strict-interleaved-thinking model through an OpenAI-compatible provider.
+
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.6.0`.
+
 ## 2.5.0 (2026-05-13)
 
 bk_box_main coding-agent runtime port, Windows self-upgrade fix, FetchURL SSRF hardening, and a broad reliability/security pass.

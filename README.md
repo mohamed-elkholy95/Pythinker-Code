@@ -48,6 +48,23 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
+## 🆕 What's New in 2.6.0
+
+> **Hotfix release for Kimi K2.x and DeepSeek users on PyPI.**
+
+The runtime fix for Moonshot's `thinking is enabled but reasoning_content is missing in assistant tool call message at index N` rejection was in the `pythinker-core` source since 2.4.0, but the published `pythinker-core==1.0.0` on PyPI predates it — so installs of `pythinker-code` 2.4.0 / 2.5.0 from PyPI kept hitting the bug on Kimi K2.5, K2.6, and DeepSeek (including through OpenCode Go). Reported in [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37).
+
+2.6.0 bumps the pinned dep:
+
+- **`pythinker-core` 1.0.0 → 1.1.0** (published independently to PyPI) — strict-interleaved providers (`kimi-k2*`, `deepseek*`) now always emit `reasoning_content` on assistant turns, with the fallback chain `ThinkPart → extract_text() → "[reasoning unavailable]"`. Multi-step tool flows on Moonshot/Kimi/DeepSeek no longer trip the strict thinking-replay check.
+- **Root pin** `pythinker-core[contrib]==1.0.0 → 1.1.0` — new installs of `pip install --upgrade pythinker-code==2.6.0` (and `uv tool install`/`upgrade`) pick up the fix automatically.
+
+No app-level changes vs 2.5.0; everything from the 2.5.0 release is still present. **Existing 2.5.0 users on Kimi K2.x / DeepSeek must upgrade to 2.6.0.**
+
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.6.0`.
+
+### What was new in 2.5.0
+
 ## 🆕 What's New in 2.5.0
 
 Coding-agent runtime hardening: runtime-enforced permission profiles, FetchURL SSRF protection, a Windows self-upgrade fix, and a configurable feedback endpoint.
@@ -63,7 +80,7 @@ Coding-agent runtime hardening: runtime-enforced permission profiles, FetchURL S
 - **anthropic 0.101 compat** — added fallbacks for the six new tool-result block types so `pyright` stays exhaustive.
 - **Telemetry hygiene** — OTel `service.name` normalized to a stable value for SigNoz dashboards; Sentry filters drop test and shutdown noise.
 
-Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.5.0`.
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.5.0` (note: 2.5.0 PyPI installs are affected by [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37) on Kimi/DeepSeek — see the 2.6.0 hotfix above).
 
 ### What was new in 2.4.0
 
