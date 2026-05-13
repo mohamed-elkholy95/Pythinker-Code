@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+## 2.5.0 (2026-05-13)
+
+bk_box_main coding-agent runtime port, Windows self-upgrade fix, FetchURL SSRF hardening, and a broad reliability/security pass.
+
+### Subagent runtime & permissions
+
+- Runtime-enforced permission profiles for every built-in role: **read-only**, **plan**, **ask**, **implement**, **review**, **verify**. Profiles are snapshot per LLM step in the new `src/pythinker_code/soul/permission.py` so a mid-step model switch can't escalate. Plan mode now **hard-denies** non-plan writes and dangerous shell mutations instead of relying on prompt-deny.
+- New plan-handoff workflow in `src/pythinker_code/tools/plan/handoff.py` with dynamic injection through `soul/dynamic_injections/plan_mode.py`. Smooth handoff from `plan` → `implement` without re-priming the context.
+- New smart-search grep variant; new subagent metadata plumbing (`subagents/models.py`, `subagents/store.py`, `subagents/builder.py`, `subagents/runner.py`).
+
+### Background tasks
+
+- Recovery distinguishes **`recoverable`** (resumable via a stored `agent_id`) from **`lost`** (worker is gone with no resume target). Agent instances are parked as `idle` rather than failed when the underlying task is recoverable.
+- Guards against overwriting terminal task states; subagent races on instance transitions closed.
+- `pythinker-host`: subprocess teardown now kills the **entire child process tree** and creates a new session group, so background workers can no longer survive their parent on Linux/macOS.
+
+### FetchURL — SSRF + resource-exhaustion hardening
+
+- `pythinker_code.tools.web.fetch._validate_fetch_url` blocks **private, loopback, link-local, multicast, and reserved** IPv4/IPv6 ranges; rejects non-`http`/`https` schemes and host-less URLs up front.
+- Responses are streamed with a hard **5 MB** ceiling (`_read_limited`) honoring `Content-Length`. Both the direct path and the configured fetch-service path enforce the same caps.
+
+### Web / vis surface
+
+- Upload limits, open-in path escaping, and vis auth all hardened (`src/pythinker_code/web/`, `src/pythinker_code/vis/`, `vis/src/lib/api.ts`).
+
+### Plugin
+
+- Plugin definitions no longer persist host credentials. Plugin **name validation** tightened to reject path-traversal and shell-meta characters.
+
+### Telemetry & observability
+
+- OTel `service.name` normalized to a stable value, decoupled from the configured display name, so SigNoz dashboards keep working across rebrands.
+- Sentry filters drop test-process noise and benign shutdown errors; `pythinker_code/telemetry/config.py` and `pythinker_code/telemetry/crash.py` updated accordingly.
+- New `tests/telemetry/test_otel_resource.py` asserts the resource identity used by the dashboards.
+
+### Windows
+
+- `pythinker update` on Windows now spawns the upgrade in a **detached console** and exits the parent process before `uv tool upgrade` runs, releasing the lock on the running `pythinker.exe`. Fixes the `os error 32: The process cannot access the file because it is being used by another process` error that blocked self-upgrade.
+- New CI matrix entry on **`windows-2025-vs2026`** (experimental, non-blocking) for the pythinker-host and pythinker-cli build, validating Visual Studio 2026 / MSVC v144 forward-compat before GitHub eventually deprecates `windows-2022`.
+
+### Feedback
+
+- New `feedback` config block: `endpoint_url`, `api_key`, `custom_headers`. The `/feedback` slash command now routes user submissions to a user-configured HTTP endpoint instead of being a no-op.
+
+### UI
+
+- Pythinker version is shown on the welcome screen.
+
+### CI
+
+- Pre-push hooks mirror CI's `check` target (`ruff format --check`, `ruff check`, `pyright`) so local pushes catch the same regressions CI does.
+- README + CHANGELOG release-validate gate hardened; the GitHub Release publish step is now resilient to transient upstream failures.
+- Spell-check vocabulary fix in `soul/permission.py` for an internal error string the typos crate flagged; experimental `windows-2025-vs2026` build no longer collides with `windows-2022` on the shared `pythinker-x86_64-pc-windows-msvc` artifact name.
+
+### Compatibility
+
+- `pythinker_core.contrib.chat_provider.anthropic`: handle the six new tool-result block types added by anthropic SDK 0.101 (`web_fetch_tool_result`, `code_execution_tool_result`, `bash_code_execution_tool_result`, `text_editor_code_execution_tool_result`, `tool_search_tool_result`, `container_upload`). pyright is exhaustive again.
+
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.5.0`.
+
 ## 2.4.0 (2026-05-11)
 
 Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free Grep fallback.
