@@ -48,6 +48,25 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 ---
 
+## 🆕 What's New in 2.5.0
+
+Coding-agent runtime hardening: runtime-enforced permission profiles, FetchURL SSRF protection, a Windows self-upgrade fix, and a configurable feedback endpoint.
+
+- **Runtime-enforced permission profiles** — every built-in role (`read-only` / `plan` / `ask` / `implement` / `review` / `verify`) is now backed by `src/pythinker_code/soul/permission.py`. Profiles are snapshot per LLM step so a mid-step model switch can't escalate. **Plan mode hard-denies** non-plan writes and dangerous shell mutations instead of relying on prompt-deny.
+- **Plan → Implement handoff** — new `tools/plan/handoff.py` plus dynamic injection through `soul/dynamic_injections/plan_mode.py` carries the approved plan into implementation without re-priming the context.
+- **FetchURL SSRF + size hardening** — `_validate_fetch_url` blocks private / loopback / link-local / multicast / reserved IPv4 + IPv6 ranges; rejects non-`http`/`https` schemes; non-host URLs. Responses are streamed with a hard **5 MB** ceiling honoring `Content-Length`.
+- **Windows self-upgrade fixed** — `pythinker update` on Windows now spawns the upgrade in a **detached console** and exits the parent before `uv tool upgrade` runs, releasing the lock on the running `pythinker.exe`. Eliminates the `os error 32: The process cannot access the file because it is being used by another process` error.
+- **Background recovery improved** — `recoverable` (resumable via stored `agent_id`) vs `lost` (worker gone, no resume target). Subagent instances are parked as `idle` when recoverable. `pythinker-host` subprocess teardown kills the entire child process tree and creates a new session group.
+- **Feedback endpoint config** — new `feedback` config block (`endpoint_url`, `api_key`, `custom_headers`). The `/feedback` slash command now routes submissions to a user-configured HTTP endpoint instead of being a no-op.
+- **Welcome-screen version banner** — installed Pythinker version is now visible up-front.
+- **VS 2026 CI forward-compat probe** — non-blocking `windows-2025-vs2026` matrix entry on the host + cli builds validates MSVC v144 ahead of GitHub's eventual `windows-2022` deprecation.
+- **anthropic 0.101 compat** — added fallbacks for the six new tool-result block types so `pyright` stays exhaustive.
+- **Telemetry hygiene** — OTel `service.name` normalized to a stable value for SigNoz dashboards; Sentry filters drop test and shutdown noise.
+
+Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.5.0`.
+
+### What was new in 2.4.0
+
 ## 🆕 What's New in 2.4.0
 
 Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free Grep fallback.
