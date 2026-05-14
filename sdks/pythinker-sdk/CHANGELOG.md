@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0 - 2026-05-14
+
 - Add `PythinkerClient`, `Conversation`, and `tool_result_to_message` helpers for ergonomic SDK agent loops.
 - Add SDK MCP client tool adapters for stdio and streamable HTTP servers.
 - Add a Tavily MCP research-agent example.

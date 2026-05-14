@@ -1,6 +1,6 @@
 [project]
 name = "pythinker-sdk"
-version = "1.0.0"
+version = "1.1.0"
 description = "A lightweight Python SDK for the Pythinker API."
 readme = "README.md"
 requires-python = ">=3.12"
