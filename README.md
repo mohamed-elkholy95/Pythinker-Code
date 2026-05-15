@@ -52,11 +52,11 @@ It speaks the [**Agent Client Protocol (ACP)**](https://github.com/agentclientpr
 
 > **Hotfix release for Kimi K2.x and DeepSeek users on PyPI.**
 
-The runtime fix for Moonshot's `thinking is enabled but reasoning_content is missing in assistant tool call message at index N` rejection was in the `pythinker-core` source since 2.4.0, but the published `pythinker-core==1.0.0` on PyPI predates it — so installs of `pythinker-code` 2.4.0 / 2.5.0 from PyPI kept hitting the bug on Kimi K2.5, K2.6, and DeepSeek (including through OpenCode Go). Reported in [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37).
+The runtime fix for the strict-interleaved `thinking is enabled but reasoning_content is missing in assistant tool call message at index N` rejection was in the `pythinker-core` source since 2.4.0, but the published `pythinker-core==1.0.0` on PyPI predates it — so installs of `pythinker-code` 2.4.0 / 2.5.0 from PyPI kept hitting the bug on Kimi K2.5, K2.6, and DeepSeek (including through OpenCode Go). Reported in [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37).
 
 2.6.0 bumps the pinned dep:
 
-- **`pythinker-core` 1.0.0 → 1.1.0** (published independently to PyPI) — strict-interleaved providers (`kimi-k2*`, `deepseek*`) now always emit `reasoning_content` on assistant turns, with the fallback chain `ThinkPart → extract_text() → "[reasoning unavailable]"`. Multi-step tool flows on Moonshot/Kimi/DeepSeek no longer trip the strict thinking-replay check.
+- **`pythinker-core` 1.0.0 → 1.1.0** (published independently to PyPI) — strict-interleaved providers (`kimi-k2*`, `deepseek*`) now always emit `reasoning_content` on assistant turns, with the fallback chain `ThinkPart → extract_text() → "[reasoning unavailable]"`. Multi-step tool flows on Kimi/DeepSeek no longer trip the strict thinking-replay check.
 - **Root pin** `pythinker-core[contrib]==1.0.0 → 1.1.0` — new installs of `pip install --upgrade pythinker-code==2.6.0` (and `uv tool install`/`upgrade`) pick up the fix automatically.
 
 No app-level changes vs 2.5.0; everything from the 2.5.0 release is still present. **Existing 2.5.0 users on Kimi K2.x / DeepSeek must upgrade to 2.6.0.**
@@ -86,11 +86,11 @@ Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.5.0`
 
 ## 🆕 What's New in 2.4.0
 
-Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free Grep fallback.
+Subagent roles overhaul, Kimi K2 provider support, and a ripgrep-free Grep fallback.
 
 - **New subagents** — `implementer` (scoped edits + verification), `review` (severity-scored read-only review), and `verifier` (`PASS` / `FAIL` / `FLAKY` validation runner). Join the existing `coder` / `explore` / `plan` roster.
 - **Structured subagent output** — every default agent now answers with `### SUMMARY / EVIDENCE / CHANGES / RISKS / BLOCKERS`, so the parent agent can consume results without re-parsing prose. New recommended flow: **Scout → Plan → Implement → Review → Verify** (review and verify can run in parallel).
-- **Kimi K2.5 / K2.6 (Moonshot) support** — `--thinking` is routed via the provider-specific `thinking.type` body field, and assistant tool-call replays always carry `reasoning_content` so multi-step tool flows stop tripping Moonshot's strict thinking-replay check. Same hardening applied to DeepSeek's strict mode.
+- **Kimi K2.5 / K2.6 support** — `--thinking` is routed via the provider-specific `thinking.type` body field, and assistant tool-call replays always carry `reasoning_content` so multi-step tool flows stop tripping the strict thinking-replay check. Same hardening applied to DeepSeek's strict mode.
 - **`Grep` works without `rg`** — pure-Python fallback honors `pattern` / `glob` / `type` / `ignore_case` / `multiline` / `context` / `output_mode` / `offset` / `head_limit` and respects `.gitignore`. The downloader also retries against the upstream GitHub releases mirror and accepts `PYTHINKER_RG_PATH=/absolute/path` plus extra discovery paths (`~/.cargo/bin`, `~/.local/bin`, `~/.pi/agent/bin`, `/usr/bin`, `/usr/local/bin`).
 - **`AGENTS.md` rewritten** to match the new roster, and `tools/agent/description.md` documents the parallel-review and cross-check patterns.
 

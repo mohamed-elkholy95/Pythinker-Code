@@ -622,11 +622,11 @@ def test_derive_model_capabilities_marks_kimi_k2_as_toggleable_thinking():
 def test_create_llm_openai_legacy_kimi_sends_disabled_thinking_body():
     provider = LLMProvider(
         type="openai_legacy",
-        base_url="https://api.moonshot.ai/v1",
+        base_url="https://api.example.com/v1",
         api_key=SecretStr("test-key"),
     )
     model = LLMModel(
-        provider="moonshot",
+        provider="kimi-provider",
         model="kimi-k2.6",
         max_context_size=262_000,
         capabilities=None,
@@ -646,11 +646,11 @@ def test_create_llm_openai_legacy_kimi_sends_disabled_thinking_body():
 def test_create_llm_openai_legacy_kimi_sends_enabled_thinking_body():
     provider = LLMProvider(
         type="openai_legacy",
-        base_url="https://api.moonshot.ai/v1",
+        base_url="https://api.example.com/v1",
         api_key=SecretStr("test-key"),
     )
     model = LLMModel(
-        provider="moonshot",
+        provider="kimi-provider",
         model="kimi-k2.6",
         max_context_size=262_000,
         capabilities=None,

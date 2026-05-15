@@ -17,7 +17,6 @@ Port the practical coding-agent runtime features from `blackbox/bk_box_main` int
 ## Phase 1 — Agent modes and hard permission profiles ✅ Done
 
 Source references:
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/agent/index.ts`
 - `blackbox/bk_box_main/packages/opencode/src/permission/*`
 - `blackbox/bk_box_main/packages/opencode/src/tool/plan.ts`
 
@@ -39,8 +38,6 @@ Acceptance:
 ## Phase 2 — Plan handoff workflow ✅ Done
 
 Source references:
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/plan-followup.ts`
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/session/prompt.ts`
 - `blackbox/bk_box_main/packages/opencode/src/session/prompt/code-switch.txt`
 
 Pythinker targets:
@@ -61,8 +58,6 @@ Acceptance:
 
 Source references:
 - `blackbox/bk_box_main/packages/opencode/src/tool/task.ts`
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/tool/task.ts`
-- `blackbox/bk_box_main/packages/kilo-vscode/src/agent-manager/WorktreeManager.ts`
 
 Pythinker targets:
 - `src/pythinker_code/tools/agent/`
@@ -82,8 +77,6 @@ Acceptance:
 
 Source references:
 - `blackbox/bk_box_main/packages/opencode/src/session/compaction.ts`
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/session/compaction-payload-recovery.ts`
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/session/prompt-queue.ts`
 
 Pythinker targets:
 - `src/pythinker_code/soul/context.py`
@@ -103,7 +96,6 @@ Acceptance:
 
 Source references:
 - `blackbox/bk_box_main/packages/opencode/src/tool/warpgrep.ts`
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/tool/semantic-search.ts`
 - `blackbox/bk_box_main/packages/opencode/src/skill/*`
 
 Pythinker targets:
@@ -124,7 +116,6 @@ Acceptance:
 
 Source references:
 - `blackbox/bk_box_main/packages/opencode/src/provider/*`
-- `blackbox/bk_box_main/packages/opencode/src/kilocode/provider/*`
 - `blackbox/bk_box_main/packages/opencode/src/session/system.ts`
 
 Pythinker targets:

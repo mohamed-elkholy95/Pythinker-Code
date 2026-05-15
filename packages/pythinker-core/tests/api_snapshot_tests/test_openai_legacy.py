@@ -397,10 +397,10 @@ async def test_openai_legacy_no_auto_reasoning_effort_without_reasoning_key():
 
 async def test_openai_legacy_reasoning_content_forced_on_assistant_tool_calls():
     """Assistant messages carrying tool calls must include `reasoning_content` (even when
-    empty) for Moonshot/Kimi-style providers that enforce it on history replay.
+    empty) for Kimi-style providers that enforce it on history replay.
 
     Reproduces: "thinking is enabled but reasoning_content is missing in assistant tool
-    call message at index N" error from Moonshot AI when replaying tool-call history.
+    call message at index N" errors when replaying tool-call history.
     """
     with respx.mock(base_url="https://api.openai.com") as mock:
         mock.post("/v1/chat/completions").mock(
@@ -435,7 +435,7 @@ async def test_openai_legacy_reasoning_content_forced_on_assistant_tool_calls():
         assistant_msg = body["messages"][1]
         assert assistant_msg["role"] == "assistant"
         assert assistant_msg.get("tool_calls"), "tool_calls should be on the assistant msg"
-        # The fix: reasoning_content is present and non-empty so Moonshot/OpenCode Go
+        # The fix: reasoning_content is present and non-empty so compatibility
         # bridges that strip empty strings still forward valid replay metadata.
         assert "reasoning_content" in assistant_msg
         assert assistant_msg["reasoning_content"] == "[reasoning unavailable]"

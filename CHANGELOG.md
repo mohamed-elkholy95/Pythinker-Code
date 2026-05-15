@@ -8,7 +8,7 @@ Packaging fix: pin `pythinker-core[contrib]==1.1.0` so the Kimi K2.x / DeepSeek 
 
 ### Why 2.6.0 lands the same day as 2.5.0
 
-The runtime fix for Moonshot's `thinking is enabled but reasoning_content is missing in assistant tool call message at index N` rejection landed in the `pythinker-core` source tree on 2026-05-11 (released in `pythinker-code` 2.4.0 source), but **the published `pythinker-core==1.0.0` on PyPI predates that change** (uploaded 2026-05-07). `pythinker-code` 2.4.0 and 2.5.0 both pinned `pythinker-core[contrib]==1.0.0`, so PyPI users on Kimi K2.5 / K2.6 / DeepSeek through OpenCode Go (and elsewhere) kept hitting the bug even on the latest CLI. Reported in [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37).
+The runtime fix for the strict-interleaved `thinking is enabled but reasoning_content is missing in assistant tool call message at index N` rejection landed in the `pythinker-core` source tree on 2026-05-11 (released in `pythinker-code` 2.4.0 source), but **the published `pythinker-core==1.0.0` on PyPI predates that change** (uploaded 2026-05-07). `pythinker-code` 2.4.0 and 2.5.0 both pinned `pythinker-core[contrib]==1.0.0`, so PyPI users on Kimi K2.5 / K2.6 / DeepSeek through OpenCode Go (and elsewhere) kept hitting the bug even on the latest CLI. Reported in [#37](https://github.com/mohamed-elkholy95/Pythinker-Code/issues/37).
 
 ### The fix
 
@@ -84,7 +84,7 @@ Upgrade with `pythinker update` or `pip install --upgrade pythinker-code==2.5.0`
 
 ## 2.4.0 (2026-05-11)
 
-Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free Grep fallback.
+Subagent roles overhaul, Kimi K2 provider support, and a ripgrep-free Grep fallback.
 
 - New built-in subagents under `src/pythinker_code/agents/default/`:
   - `implementer.yaml` — scoped code changes with minimum surrounding edits and a quick verification pass.
@@ -93,8 +93,8 @@ Subagent roles overhaul, Moonshot/Kimi K2 provider support, and a ripgrep-free G
 - `coder.yaml`, `explore.yaml`, and `plan.yaml` now emit a standard `### SUMMARY / EVIDENCE / CHANGES / RISKS / BLOCKERS` response contract so the parent agent can consume subagent output without re-parsing prose.
 - `agent.yaml` registers the three new roles; `tools/agent/description.md` documents the Scout → Plan → Implement → Review → Verify workflow and the parallel review/verification pattern.
 - `agents/default/system.md`: adds decomposition guidance (preview → todo list → parallel chunks), enforces post-tool-call verification before acting on results, and tells the agent to cross-check at least one load-bearing subagent finding before editing from it.
-- Kimi K2.5 / K2.6 (Moonshot) and other strict interleaved-thinking providers:
-  - `packages/pythinker-core/.../chat_provider/pythinker.py`: always emit `reasoning_content` on assistant tool-call replays so Moonshot's "thinking is enabled but reasoning_content is missing in assistant tool call message at index N" error no longer trips multi-step tool flows.
+- Kimi K2.5 / K2.6 and other strict interleaved-thinking providers:
+  - `packages/pythinker-core/.../chat_provider/pythinker.py`: always emit `reasoning_content` on assistant tool-call replays so the strict "thinking is enabled but reasoning_content is missing in assistant tool call message at index N" error no longer trips multi-step tool flows.
   - `packages/pythinker-core/.../contrib/chat_provider/openai_legacy.py`: replay reasoning metadata on every assistant turn for `kimi-k2*` / `deepseek*` models (falls back to the assistant text or `"[reasoning unavailable]"` when reasoning content was not retained).
   - `src/pythinker_code/llm.py`: route Kimi K2 thinking through the provider-specific `extra_body={"thinking": {"type": "enabled"|"disabled"}}` body field instead of OpenAI's `reasoning_effort` (which Kimi ignores), and persist `LLM.thinking` across `clone_llm_with_model_alias` so model switches preserve the user's thinking choice.
 - `tools/file/grep_local.py`:

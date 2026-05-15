@@ -329,12 +329,11 @@ def _convert_message(message: Message) -> ChatCompletionMessageParam:
         # Dropping `content` entirely is always accepted, so do that whenever
         # the visible content is effectively empty alongside a tool call.
         dumped_message.pop("content", None)
-    # Moonshot/Kimi (and similar interleaved-thinking providers) require
-    # `reasoning_content` on every assistant tool-call message in history.
-    # Force the field on assistant messages with tool calls even when
-    # reasoning_content is empty, otherwise the next request fails with
-    # "thinking is enabled but reasoning_content is missing in assistant
-    # tool call message at index N".
+    # Kimi-style interleaved-thinking providers require `reasoning_content`
+    # on every assistant tool-call message in history. Force the field on
+    # assistant messages with tool calls even when reasoning_content is empty,
+    # otherwise the next request fails with "thinking is enabled but
+    # reasoning_content is missing in assistant tool call message at index N".
     has_tool_calls = message.role == "assistant" and bool(message.tool_calls)
     if reasoning_content or has_tool_calls:
         dumped_message["reasoning_content"] = reasoning_content

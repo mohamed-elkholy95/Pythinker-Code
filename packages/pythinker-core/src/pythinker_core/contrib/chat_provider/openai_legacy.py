@@ -214,10 +214,10 @@ class OpenAILegacy:
             message.content = content
         dumped_message = message.model_dump(exclude_none=True)
         if self._reasoning_key:
-            # Moonshot/Kimi (and similar interleaved-thinking providers) require
-            # consistent reasoning replay metadata on assistant history. At a
-            # minimum tool-call turns need the field, and known strict models
-            # are safest when all assistant turns include it, even if empty.
+            # Kimi-style interleaved-thinking providers require consistent
+            # reasoning replay metadata on assistant history. At a minimum
+            # tool-call turns need the field, and known strict models are
+            # safest when all assistant turns include it, even if empty.
             has_tool_calls = message.role == "assistant" and bool(message.tool_calls)
             strict_interleaved = message.role == "assistant" and _is_strict_interleaved_model(
                 self.model
